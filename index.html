@@ -1706,10 +1706,14 @@ if (tabName === 'dashboard') {
              <div class="draggable-container" draggable="true" id="drag-workforce">
 <div class="hero-card" style="margin-top:0; padding:18px;">
 
-  <div class="hero-title"
-       style="font-size:18px; font-weight:800; color:#1c2434;">
-    Workforce Status
-  </div>
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+    <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+        <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">badge</span>
+    </div>
+    <div class="hero-title" style="font-size:18px; font-weight:800; color:#1c2434; letter-spacing: -0.3px;">
+        Workforce Status
+    </div>
+</div>
 
   <div class="hero-slider-wrap">
 
@@ -1782,10 +1786,15 @@ if (tabName === 'dashboard') {
 
         <div class="draggable-container" draggable="true" id="drag-shift-health">
             <div class="section-card" style="background: #fff; border-left: 6px solid #ff5252; margin-top: 0; padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-                    <h4 style="font-size: 18px; font-weight: 800; color: #1c2434;">Shift Health</h4>
-                    <span style="font-size: 11px; background: #fff1f0; color: #ff5252; padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 1px solid #ffccc7; letter-spacing: 0.5px;">2 ACTIONS REQUIRED</span>
-                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+            <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">health_and_safety</span>
+        </div>
+        <h4 style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">Shift Health</h4>
+    </div>
+    <span style="font-size: 11px; background: #fff1f0; color: #ff5252; padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 1px solid #ffccc7; letter-spacing: 0.5px;">2 ACTIONS REQUIRED</span>
+</div>
 
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                     <div style="display: flex; align-items: center; gap: 14px; background: #fafafa; padding: 14px; border-radius: 14px; border: 1px solid #f0f0f0;">
@@ -1818,7 +1827,15 @@ if (tabName === 'dashboard') {
 
         <div class="draggable-container" draggable="true" id="drag-operational-context">
             <div class="section-card" style="margin-top: 0; padding: 18px;">
-<div class="section-title" style="font-size: 18px; font-weight: 800; color: #1c2434; margin-bottom: 18px;">Operational Context</div>                <div style="display: flex; gap: 14px; align-items: stretch;">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+    <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+        <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">info</span>
+    </div>
+    <div class="section-title" style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">
+        Operational Context
+    </div>
+</div>
+<div style="display: flex; gap: 14px; align-items: stretch;">
                     <div onclick="openWeatherDetails()" 
                          style="flex: 1; cursor: pointer; background: linear-gradient(135deg, #4a90e2, #63a4ff); border-radius: 16px; padding: 14px; color: white; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);"
                          onmousedown="this.style.transform='scale(0.97)'" 
@@ -1848,36 +1865,65 @@ if (tabName === 'dashboard') {
 
 
         <div class="draggable-container" draggable="true" id="drag-labor-budget">
-            <div class="section-card" style="background: #ffffff; margin-top: 0; border-radius: 20px; padding: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">account_balance_wallet</span>
-                        <span style="font-size: 18px; font-weight: 800; color: #1c2434;">Labor Budget Burn</span>
-                        <span class="material-icons-outlined" onclick="openEditLabor()" style="font-size: 20px; color: #4a90e2; cursor: pointer;">tune</span>
-                    </div>
-                    <div id="laborSelectors" style="display: flex; gap: 6px; background: #f0f2f5; padding: 4px; border-radius: 10px;">
-                        <button onclick="updateLaborView('Daily', this)" class="labor-sel active" style="border:none; background:#fff; font-size:11px; padding:5px 12px; border-radius:8px; font-weight:700; cursor:pointer; color:#4a90e2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Daily</button>
-                        <button onclick="updateLaborView('Weekly', this)" class="labor-sel" style="border:none; background:transparent; font-size:11px; padding:5px 12px; color:#666; cursor:pointer; font-weight:600;">Weekly</button>
-                        <button onclick="updateLaborView('Pay Period', this)" class="labor-sel" style="border:none; background:transparent; font-size:11px; padding:5px 12px; color:#666; cursor:pointer; font-weight:600;">Pay Period</button>
-                    </div>
+    <div class="section-card" style="
+        background: #ffffff; 
+        margin-top: 0; 
+        border-radius: 24px; 
+        padding: 22px; 
+        box-shadow: 0 12px 30px rgba(0,0,0,0.04);
+        border: 1px solid #f1f5f9;
+    ">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="background: #4a90e2; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);">
+                    <span class="material-icons-outlined" style="font-size: 22px; color: #fff;">analytics</span>
                 </div>
-                
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:12px;">
-                    <div>
-                        <div id="laborViewLabel" style="font-size: 12px; color: #777; font-weight: 600; text-transform: uppercase;">Daily Actual</div>
-                        <div style="font-size: 22px; font-weight: 800; color: #1c2434;">$1,476 <span style="font-size: 14px; color: #aaa; font-weight: 400;">/ <span id="currentLimitDisplay">$1,800</span></span></div>
-                    </div>
-                    <div style="text-align: right;">
-                        <span id="percentDisplay" style="font-size: 16px; color: #ff8a00; font-weight: 800;">82%</span>
-                        <div style="font-size: 11px; color: #aaa;">Used</div>
-                    </div>
+                <div>
+                    <span style="font-size: 17px; font-weight: 800; color: #1c2434; letter-spacing: -0.3px; display: block;">Budget Burn</span>
+                    <div id="laborViewLabel" style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Live Tracking</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div onclick="openEditLabor()" style="background: #f0f7ff; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #e0efff; transition: all 0.2s ease;" onmouseover="this.style.background='#e0efff'">
+                    <span class="material-icons-outlined" style="font-size: 18px; color: #4a90e2;">tune</span>
                 </div>
 
-                <div style="height:14px; background:#f0f2f5; border-radius:12px; overflow:hidden; position: relative;">
-                    <div id="laborProgressBar" style="width:82%; height:100%; background:linear-gradient(90deg, #20c997, #ffb100); border-radius:12px; transition: width 0.5s ease;"></div>
+                <div id="laborSelectors" style="display: flex; background: #f8fafc; padding: 3px; border-radius: 10px; border: 1px solid #f1f5f9;">
+                    <button onclick="updateLaborView('Daily', this)" class="labor-sel active" style="border:none; background:#fff; font-size:10px; padding:6px 10px; border-radius:7px; font-weight:800; color:#4a90e2; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor:pointer;">D</button>
+                    <button onclick="updateLaborView('Weekly', this)" class="labor-sel" style="border:none; background:transparent; font-size:10px; padding:6px 10px; color:#94a3b8; font-weight:700; cursor:pointer;">W</button>
+                    <button onclick="updateLaborView('Pay Period', this)" class="labor-sel" style="border:none; background:transparent; font-size:10px; padding:6px 10px; color:#94a3b8; font-weight:700; cursor:pointer;">P</button>
                 </div>
             </div>
         </div>
+        
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px;">
+            <div>
+                <div style="font-size: 30px; font-weight: 900; color: #1c2434; letter-spacing: -0.8px; line-height: 1;">
+                    $1,476
+                </div>
+                <div style="font-size: 13px; color: #64748b; font-weight: 500; margin-top: 6px;">
+                    Limit <span id="currentLimitDisplay" style="color: #1c2434; font-weight: 700;">$1,800</span>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div id="percentDisplay" style="font-size: 18px; color: #ff8a00; font-weight: 800;">82%</div>
+                <div style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Budget Used</div>
+            </div>
+        </div>
+
+        <div style="height:10px; background:#f1f5f9; border-radius:10px; overflow:hidden; position: relative;">
+            <div id="laborProgressBar" style="
+                width:82%; 
+                height:100%; 
+                background-image: linear-gradient(to right, #20c997 0%, #20c997 60%, #ff8a00 80%, #ff5252 100%);
+                background-size: 300px 100%; /* Keeps the color fixed relative to the container */
+                border-radius:10px; 
+                transition: width 0.8s ease-in-out;
+            "></div>
+        </div>
+    </div>
+</div>
 
         <div class="draggable-container" draggable="true" id="drag-actions">
             <div class="section-card" style="margin-top: 0; padding: 18px;">
@@ -1917,7 +1963,14 @@ if (tabName === 'dashboard') {
 
         <div class="draggable-container" draggable="true" id="drag-insights">
             <div class="graph-card" style="margin-top: 0; padding: 18px;">
-                <div class="graph-title" style="font-size: 18px; font-weight: 800; color: #1c2434;">Insights</div>
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+    <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+        <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">insights</span>
+    </div>
+    <div class="graph-title" style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">
+        Insights
+    </div>
+</div>
                 <div class="graph-slider-wrap">
                     <div class="graph-slider" id="graphSlider">
                         <div class="graph-page"><div class="graph-tile"><canvas id="deptChart"></canvas></div></div>
