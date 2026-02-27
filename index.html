@@ -1,0 +1,3948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zip Clock Redesign</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <style>
+        :root {
+            --primary-bg: #343a4a;
+            --sidebar-bg: #ffffff;
+            --active-blue: #4a90e2;
+            --text-dark: #333;
+            --text-light: #777;
+            --border-color: #e0e0e0;
+            --header-dark: #2c313c;
+            --iphone-w: 428px;
+    --iphone-h: 926px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+
+        body {
+    background-color: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+        /* --- Header --- */
+        .app-header {
+    background-color: var(--primary-bg);
+    color: white;
+    padding: 45px 15px 10px; /* Top padding increased for Notch clearance */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100px !important; /* Total height to fit buttons + notch space */
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        .menu-btn { cursor: pointer; font-size: 28px; }
+
+        /* --- Top Navigation Tabs --- */
+        .top-nav {
+            background-color: var(--primary-bg);
+            display: flex;
+            justify-content: space-around;
+            border-top: 1px solid #444;
+        }
+
+        .nav-item {
+            color: #aaa;
+            padding: 10px 5px;
+            text-align: center;
+            font-size: 12px;
+            flex: 1;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+
+        .nav-item.active {
+            color: white;
+            border-bottom: 3px solid var(--active-blue);
+        }
+
+        .nav-item span { display: block; font-size: 20px; margin-bottom: 2px; }
+
+        /* --- Sidebar Menu --- */
+        .overlay {
+    position: absolute; /* Changed from fixed */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    z-index: 1999;
+}
+
+       .sidebar {
+    position: absolute; /* Changed from fixed */
+    top: 0;
+    left: -280px; 
+    width: 280px;
+    height: 100%;
+    background: var(--sidebar-bg);
+    z-index: 2000; /* Higher than header */
+    transition: 0.3s;
+    overflow-y: auto;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+}
+
+        .sidebar.open { left: 0; }
+
+        .user-profile {
+            background-color: var(--header-dark);
+            color: white;
+            padding: 20px 15px;
+            position: relative;
+        }
+
+        .profile-top { display: flex; align-items: center; gap: 12px; }
+        .logo-circle {
+            width: 45px; height: 45px; border: 2px solid white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 20px;
+        }
+        .user-info h4 { font-size: 16px; margin-bottom: 2px; }
+        .user-info p { font-size: 11px; opacity: 0.8; }
+        .timestamp { font-size: 10px; margin-top: 10px; opacity: 0.7; }
+
+        /* Sidebar Navigation List */
+        .menu-list { list-style: none; padding: 10px 0; }
+        .menu-group-title { padding: 15px 15px 5px; font-size: 12px; color: var(--active-blue); font-weight: bold; }
+        
+        .menu-link {
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            color: var(--text-dark);
+            text-decoration: none;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .menu-link span.material-icons-outlined { margin-right: 15px; color: #777; font-size: 20px; }
+        .menu-link .arrow { margin-left: auto; font-size: 18px; transition: 0.3s; }
+        .menu-link.expanded .arrow { transform: rotate(180deg); }
+
+        /* Submenu with hierarchy lines */
+        .submenu { display: none; list-style: none; padding-left: 25px; position: relative; }
+        .submenu.show { display: block; }
+        
+        .submenu-item {
+            padding: 10px 15px;
+            font-size: 13px;
+            color: #666;
+            position: relative;
+            cursor: pointer;
+        }
+
+        /* The blue hierarchy lines */
+        .submenu-item::before {
+            content: ""; position: absolute; left: -10px; top: 0; width: 1px; height: 100%; background: #ccc;
+        }
+        .submenu-item::after {
+            content: ""; position: absolute; left: -10px; top: 20px; width: 10px; height: 1px; background: #ccc;
+        }
+        /* Styling for the active submenu item */
+.submenu-item.active-sub {
+    color: var(--active-blue);
+    font-weight: 500;
+}
+
+/* Ensure the hierarchy lines also turn blue for the active item */
+.submenu-item.active-sub::before, 
+.submenu-item.active-sub::after {
+    background: var(--active-blue);
+}
+
+        /* --- Footer (Screenshots 4 & 5) --- */
+        .app-footer {
+            position: absolute;
+            bottom: 25px; /* Stay above the home indicator */
+    width: 100%;
+            display: none; /* Controlled by JS */
+            grid-template-columns: repeat(3, 1fr);
+            background: #e9ecef;
+            border-top: 1px solid #ddd;
+            height: 70px;
+        }
+
+        .footer-stat {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border-right: 1px solid #ddd;
+            color: var(--text-light);
+        }
+        .footer-stat:last-child { border-right: none; }
+        .footer-stat .val { font-size: 18px; color: #555; }
+        .footer-stat .val.blue-text { color: var(--active-blue); }
+        .footer-stat .label { font-size: 11px; margin-top: 2px; }
+        .footer-stat span.material-icons-outlined { color: var(--active-blue); font-size: 28px; }
+
+        /* --- Main Content Area --- */
+        .content { padding: 15px; padding-bottom: 80px; }
+        .alert-card {
+            background: white; border: 1px solid var(--border-color);
+            border-radius: 4px; padding: 15px; display: flex; align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .avatar-ds {
+            width: 40px; height: 40px; background: #26c6da; color: white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; margin-right: 12px;
+        }
+        .alert-info h5 { font-size: 14px; color: #333; }
+        .badge-start { 
+            background: #ff5252; color: white; font-size: 10px; 
+            padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 4px;
+        }
+        .alert-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+        .sad-face { color: #ff5252; font-size: 24px; }
+
+        /* Sidebar Bottom Actions */
+        .sidebar-footer {
+            position: sticky; bottom: 0; background: #eee;
+            display: flex; border-top: 1px solid #ddd;
+        }
+        .sidebar-footer div {
+            flex: 1; padding: 12px; text-align: center; font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .logout-btn { color: #ff5252; }
+
+        /* --- Additional Styles for Dashboard Tab  --- */
+
+        .dash-container { display:flex; flex-direction:column; gap:16px; }
+
+.dash-title {
+  font-weight:600;
+  font-size:16px;
+  color:#1c2434;
+  margin-top:4px;
+}
+
+/* ACTION TILES */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px; /* Tighter spacing */
+    padding: 4px 0;
+}
+
+.action-tile {
+  border-radius:12px;
+  padding:12px;
+  color:white;
+  text-align:center;
+  font-size:12px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.12);
+}
+
+.action-tile span { font-size:20px; }
+.action-tile b { font-size:18px; display:block; margin-top:4px; }
+
+.red { background:#ff5252; }
+.orange { background:#ff8a00; }
+.amber { background:#f5b700; }
+.blue { background:#4a90e2; }
+
+/* KPI CARDS */
+.kpi-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+}
+
+.kpi-card {
+  background:white;
+  border-radius:14px;
+  padding:16px;
+  text-align:center;
+  box-shadow:0 4px 12px rgba(0,0,0,0.06);
+}
+
+.kpi-card span { font-size:24px; color:#4a90e2; }
+.kpi-num { font-size:22px; font-weight:700; }
+
+/* LABOR CARD */
+.labor-card {
+  background:white;
+  padding:16px;
+  border-radius:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.06);
+}
+
+.labor-header {
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:10px;
+}
+
+.progress-bar {
+  height:10px;
+  background:#eee;
+  border-radius:8px;
+  overflow:hidden;
+}
+
+.progress-fill {
+  width:80%;
+  height:100%;
+  background:linear-gradient(90deg,#4a90e2,#21c4b5);
+}
+
+/* CHART PLACEHOLDER */
+.chart-placeholder {
+  height:120px;
+  background:white;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#999;
+  box-shadow:0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* STATUS GRID */
+.status-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+
+.status {
+  padding:14px;
+  border-radius:12px;
+  text-align:center;
+  font-weight:600;
+  color:white;
+}
+
+.green { background:#20c997; }
+.yellow { background:#f5b700; }
+.red { background:#ff5252; }
+.blue { background:#4a90e2; }
+
+/* INFO + INSIGHT */
+.info-card, .insight-card {
+  padding:16px;
+  border-radius:14px;
+  background:white;
+  box-shadow:0 4px 12px rgba(0,0,0,0.06);
+}
+
+.insight-card {
+  background:linear-gradient(135deg,#fff5d6,#fff9ea);
+  font-weight:600;
+}
+
+.chart-card {
+  background:white;
+  border-radius:14px;
+  padding:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.06);
+}
+
+.chart-full {
+  width: 100%;
+  height: 280px;              /* 👈 BIG visual impact */
+  background: linear-gradient(145deg,#ffffff,#f7f9fc);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* VERY IMPORTANT */
+.chart-full canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.action-tile {
+  border-radius: 12px;
+  padding: 10px 6px;
+  color: white;
+  text-align: center;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 70px;
+}
+
+.action-tile span {
+  font-size: 18px;
+  opacity: 0.95;
+}
+
+.action-tile .txt {
+  font-size: 11px;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+
+.action-tile b {
+  font-size: 18px;
+  margin-top: 2px;
+}
+
+/* Colors */
+.red { background: linear-gradient(135deg,#ff5a5a,#ff3d3d); }
+.orange { background: linear-gradient(135deg,#ff9800,#ff7a00); }
+.amber { background: linear-gradient(135deg,#f5b700,#e6a300); }
+.blue { background: linear-gradient(135deg,#4a90e2,#2f7bd9); }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.kpi-card {
+  background: linear-gradient(145deg,#ffffff,#f7f9fc);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 78px;
+}
+
+.kpi-card span {
+  font-size: 20px;
+  color: #4a90e2;
+}
+
+.kpi-num {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: #666;
+}
+
+/* ===== Workforce Slider WITH Pagination ===== */
+
+.hero-card {
+  background: linear-gradient(135deg,#ffffff,#f7f9fc);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  margin-top: 16px;
+}
+
+.hero-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #1c2434;
+}
+
+/* Slider wrapper */
+.hero-slider-wrap {
+  overflow: hidden;
+}
+
+/* Track */
+.hero-slider {
+  display: flex;
+  transition: transform 0.35s ease;
+}
+
+/* Each page holds 3 tiles */
+
+.hero-page {
+  min-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+
+/* Tile */
+.hero-stat {
+  border-radius: 16px;
+  padding: 14px 10px;
+  color: white;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+
+  /* KEY FOR PERFECT ALIGNMENT */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 78px;
+}
+
+.hero-stat .material-icons-outlined {
+  font-size: 22px;
+  margin-bottom: 4px;
+  opacity: 0.95;
+}
+
+
+
+.hero-stat span { font-size: 20px; }
+
+/* Number */
+.hero-num {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Label */
+.hero-label {
+  font-size: 12px;
+  opacity: 0.95;
+}
+
+/* Colors */
+.stat-green { background: linear-gradient(135deg,#20c997,#14a085); }
+.stat-yellow { background: linear-gradient(135deg,#f5b700,#e6a300); }
+.stat-red { background: linear-gradient(135deg,#ff5252,#ff3d3d); }
+.stat-blue { background: linear-gradient(135deg,#4a90e2,#2f7bd9); }
+.stat-purple { background: linear-gradient(135deg,#8e5cf7,#6d3ce6); }
+
+/* ===== DOT INDICATORS ===== */
+
+.hero-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cfd6df;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.hero-dot.active {
+  background: #4a90e2;
+  transform: scale(1.25);
+}
+
+/* ===== Premium Employee List Card ===== */
+
+.emp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.emp-card {
+  background: white;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transition: transform 0.15s ease;
+}
+
+.emp-card:active {
+  transform: scale(0.98);
+}
+
+.emp-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(135deg,#4a90e2,#2f7bd9);
+  color: white;
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.emp-info {
+  flex: 1;
+}
+
+.emp-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c2434;
+}
+
+.emp-sub {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+}
+
+.emp-badge {
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+/* Badge Colors */
+
+.badge-green { background: #20c997; }
+.badge-yellow { background: #f5b700; }
+.badge-red { background: #ff5252; }
+.badge-blue { background: #4a90e2; }
+.badge-purple { background: #8e5cf7; }
+
+/* Section Title */
+
+.page-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #1c2434;
+}
+
+/* ===== Need Actions Tiles ===== */
+
+.action-section {
+  margin-top: 6px;
+}
+
+.action-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c2434;
+  margin-bottom: 10px;
+}
+
+.action-grid-need {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.action-tile-need {
+  background: white;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 5px solid #4a90e2;
+}
+
+.action-tile-need:active {
+  transform: scale(0.98);
+}
+
+/* Icon circle */
+
+.action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+}
+
+/* Content */
+
+.action-info {
+  flex: 1;
+}
+
+.action-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c2434;
+}
+
+.action-count {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+}
+
+/* Different colors */
+
+.icon-red { background: #ff5252; }
+.icon-orange { background: #ff8a00; }
+.icon-amber { background: #f5b700; }
+.icon-blue { background: #4a90e2; }
+.icon-purple { background: #8e5cf7; }
+
+/* ===== Section Card Container ===== */
+
+.section-card {
+  background: linear-gradient(145deg,#ffffff,#f6f8fb);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  margin-top: 12px;
+}
+
+/* Section Title inside card */
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c2434;
+  margin-bottom: 12px;
+}
+
+/* ===== Section Card Container ===== */
+
+.section-card {
+  background: linear-gradient(145deg,#ffffff,#f6f8fb);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  margin-top: 12px;
+}
+
+/* Section Title inside card */
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c2434;
+  margin-bottom: 12px;
+}
+
+/* ===== Compact Graph Section ===== */
+
+.graph-card {
+  background: linear-gradient(145deg,#ffffff,#f6f8fb);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  margin-top: 12px;
+}
+
+.graph-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #1c2434;
+}
+
+.graph-slider-wrap { overflow: hidden; }
+
+.graph-slider {
+  display: flex;
+  transition: transform .35s ease;
+}
+
+.graph-page {
+  min-width: 100%;
+}
+
+/* Single graph tile */
+
+.graph-tile {
+  background: linear-gradient(145deg,#ffffff,#f9fbff);
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+}
+
+/* Compact height */
+
+.graph-tile canvas {
+  width: 100% !important;
+  height: 210px !important;   /* ⭐ Increased height */
+}
+
+/* Dots */
+
+.graph-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.graph-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cfd6df;
+  cursor: pointer;
+}
+
+.graph-dot.active {
+  background: #4a90e2;
+  transform: scale(1.25);
+}
+
+.graph-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c2434;
+  margin-bottom: 12px;   /* ⭐ Increased spacing */
+}
+
+/* Extra spacing inside tile */
+
+/* Update this in your CSS section */
+.graph-tile canvas {
+  width: 100% !important;
+  height: 250px !important; /* Increased from 180px to 250px */
+  margin-top: 0px; 
+}
+
+/* Drag and Drop Styles */
+.draggable-container {
+    cursor: grab;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.draggable-container:active {
+    cursor: grabbing;
+}
+
+.draggable-container.dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+}
+
+.draggable-container.drag-over {
+    border: 2px dashed #4a90e2;
+    border-radius: 18px;
+}
+
+/* Requests Tab Specific UI */
+.request-container { padding: 10px; background: #f4f7f9; min-height: 100vh; }
+.invite-btn-top { 
+    background: #73c2fb; color: white; border-radius: 25px; padding: 10px; 
+    text-align: center; font-weight: 500; margin-bottom: 20px; display: flex; 
+    align-items: center; justify-content: center; gap: 10px; font-size: 14px;
+}
+.req-section-title { text-align: center; color: #888; font-size: 14px; margin: 15px 0; }
+.req-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+.req-card { 
+    background: white; border-radius: 8px; position: relative; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: visible;
+}
+.req-card-body { 
+    padding: 20px 10px; text-align: center; flex: 1; display: flex; 
+    flex-direction: column; align-items: center; justify-content: center;
+}
+.req-card-body img, .req-card-body span.icon { 
+    font-size: 40px; color: #73c2fb; opacity: 0.6; margin-bottom: 10px; 
+}
+.req-card-label { font-size: 11px; color: #666; line-height: 1.3; margin-top: 5px; }
+.req-card-footer { 
+    background: #73c2fb; color: white; padding: 8px; font-size: 11px; 
+    text-align: center; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; 
+}
+.count-bubble {
+    position: absolute; top: -8px; right: -8px; background: #73c2fb; 
+    color: white; width: 22px; height: 22px; border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center; 
+    font-size: 11px; font-weight: bold; border: 2px solid white;
+}
+
+/* Shift Mgmt & Request Grid UI */
+.tab-container { padding: 12px; background: #f4f7f9; min-height: 100vh; }
+.tab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+.card-unit { 
+    background: white; border-radius: 8px; position: relative; 
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08); display: flex; flex-direction: column;
+}
+.card-content { 
+    padding: 20px 10px; text-align: center; flex: 1; display: flex; 
+    flex-direction: column; align-items: center; justify-content: center;
+}
+.card-content .material-icons-outlined { font-size: 38px; color: #73c2fb; opacity: 0.6; margin-bottom: 8px; }
+.card-desc { font-size: 11px; color: #777; font-weight: 500; line-height: 1.2; height: 30px; }
+.card-banner { 
+    background: #73c2fb; color: white; padding: 10px; font-size: 11px; 
+    text-align: center; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; 
+    font-weight: 600;
+}
+.count-badge {
+    position: absolute; top: -6px; right: -6px; background: #73c2fb; 
+    color: white; width: 22px; height: 22px; border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center; 
+    font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Punch Management Specific UI */
+.punch-mgmt-container { padding: 10px; background: #f8f9fa; }
+
+/* Section 1: Calendar Bar */
+.calendar-bar {
+    background: #fff;
+    border-radius: 25px;
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    margin: 10px auto;
+    width: fit-content;
+    border: 1px solid #eee;
+}
+.calendar-bar .material-icons-outlined { color: #4a90e2; font-size: 20px; cursor: pointer; }
+.date-range-text { font-size: 14px; font-weight: 500; color: #333; }
+
+/* Section 3: Filter Button */
+.filter-btn-wrap { display: flex; justify-content: center; margin: 15px 0; }
+.filter-pill {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 6px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #555;
+    cursor: pointer;
+}
+
+/* Section 4: Employee Cards */
+.punch-card {
+    background: white;
+    margin-bottom: 8px;
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-left: 4px solid #ddd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.punch-user-info { display: flex; align-items: center; gap: 12px; }
+.punch-avatar {
+    width: 45px; height: 45px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: bold; font-size: 18px; position: relative;
+}
+.mini-badge {
+    position: absolute; top: -2px; left: -2px; width: 16px; height: 16px;
+    background: #20c997; border-radius: 3px; font-size: 10px;
+    display: flex; align-items: center; justify-content: center; color: white;
+}
+.punch-details h5 { font-size: 15px; margin-bottom: 2px; color: #1c2434; }
+.punch-time { font-size: 12px; color: #777; display: flex; align-items: center; gap: 4px; }
+/* Updated container for the right side of the card */
+.punch-amount {
+    display: flex;
+    align-items: center; /* Vertically centers the text and arrow */
+    justify-content: flex-end; /* Aligns all children to the right */
+    gap: 8px; /* Adds a consistent gap between the price and the arrow */
+    flex: 1; /* Allows the container to grow and push to the end */
+    text-align: right;
+}
+
+/* Specific styling for the value */
+.punch-val {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+    white-space: nowrap; /* Prevents the dollar amount from wrapping */
+}
+/* Section 5: Filter Modal */
+.modal-overlay {
+  position: absolute;        /* NOT fixed */
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 3000;
+  display: none;
+}
+
+/* Bottom sheet modal */
+
+.filter-modal {
+  position: absolute;        /* NOT fixed */
+  bottom: 0;
+  left: 0;
+  width: 100%;
+
+  background: white;
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+
+  padding: 20px;
+  z-index: 3001;
+
+  display: none;
+
+  /* Mobile height */
+  max-height: 88%;
+  overflow-y: auto;
+
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.filter-group { margin-bottom: 20px; }
+.filter-group h6 { font-size: 13px; color: #888; margin-bottom: 10px; text-transform: uppercase; }
+.checkbox-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; }
+.modal-footer { display: flex; gap: 10px; margin-top: 20px; }
+.btn-clear { flex: 1; padding: 12px; border-radius: 25px; border: none; background: #ffebeb; color: #ff5252; font-weight: 600; }
+.btn-apply { flex: 1; padding: 12px; border-radius: 25px; border: none; background: #5cb85c; color: white; font-weight: 600; }
+
+/* Badge & Button Refinements */
+.mini-badge {
+    position: absolute; top: -2px; left: -2px; width: 16px; height: 16px;
+    border-radius: 3px; font-size: 10px; display: flex; 
+    align-items: center; justify-content: center; color: white; font-weight: bold;
+}
+.badge-m { background: #20c997; } /* Mismatch Badge */
+.badge-s { background: #4a90e2; } /* Short Break Badge */
+
+.btn-proceed {
+    width: 100%; border-radius: 25px; border: none; padding: 15px;
+    background: #5cb85c; color: white; font-weight: 700; font-size: 15px;
+    box-shadow: 0 4px 10px rgba(92, 184, 92, 0.3);
+}
+
+/* Modern Table Container */
+.modern-table-card {
+    background: white;
+    border-radius: 20px;
+    padding: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    margin-top: 15px;
+    border: 1px solid #f0f2f5;
+    overflow: hidden;
+}
+
+.modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.modern-table thead th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 15px 10px;
+    text-align: center;
+}
+
+.modern-table thead th:first-child {
+    text-align: left;
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+.modern-table thead th:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.modern-table tbody td {
+    padding: 18px 10px;
+    font-size: 14px;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: center;
+}
+
+.modern-table tbody td:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Highlighting the "Current" column for focus */
+.col-highlight {
+    color: #4a90e2 !important;
+    font-weight: 700;
+    background: rgba(74, 144, 226, 0.03);
+}
+
+.modern-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Hover effect for interactivity */
+.modern-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+
+/* ===== AI INSIGHTS TAB ===== */
+
+/* ============================
+   PREMIUM AI INSIGHTS UI
+   ============================ */
+
+.ai-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ===== HERO AI CARD ===== */
+
+.ai-hero {
+  position: relative;
+  padding: 26px;
+  border-radius: 26px;
+  color: white;
+  background:
+    radial-gradient(circle at 20% 20%, #7aa7ff 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, #9b7bff 0%, transparent 40%),
+    linear-gradient(135deg,#3f7cff,#6b5cff);
+  box-shadow:
+    0 20px 60px rgba(74,144,226,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+  overflow: hidden;
+}
+
+.ai-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg,transparent,rgba(255,255,255,0.15),transparent);
+  pointer-events: none;
+}
+
+.ai-hero-title {
+  font-size: 22px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-badge {
+  background: rgba(255,255,255,0.2);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+.ai-summary-text {
+  margin-top: 14px;
+  font-size: 16px;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+/* ===== PREMIUM CARD ===== */
+
+.ai-card {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(14px);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow:
+    0 12px 35px rgba(0,0,0,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+.ai-section-title {
+  font-size: 17px;
+  font-weight: 800;
+  margin-bottom: 14px;
+  color: #1c2434;
+}
+
+/* ===== ACTION TILE ===== */
+
+.ai-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  background: white;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.07);
+  transition: transform 0.18s ease;
+}
+
+.ai-action:hover {
+  transform: translateY(-2px);
+}
+
+.ai-action-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 22px;
+}
+
+.icon-danger { background: linear-gradient(135deg,#ff5a5a,#ff2f2f); }
+.icon-warn   { background: linear-gradient(135deg,#ffb347,#ff9800); }
+.icon-info   { background: linear-gradient(135deg,#4a90e2,#2f7bd9); }
+
+.ai-action button {
+  margin-left: auto;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 14px;
+  background: #4a90e2;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ===== FORECAST GRID ===== */
+
+.ai-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 12px;
+}
+
+.ai-forecast-tile {
+  border-radius: 18px;
+  padding: 16px;
+  text-align: center;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.15);
+}
+
+.tile-sales  { background: linear-gradient(135deg,#20c997,#14a085); }
+.tile-staff  { background: linear-gradient(135deg,#8e5cf7,#6d3ce6); }
+.tile-labor  { background: linear-gradient(135deg,#ff8a00,#ff5e00); }
+
+.ai-big {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+/* ===== RECOMMENDATION ===== */
+
+.ai-rec {
+  background: linear-gradient(135deg,#fff4cc,#ffe29f);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+}
+
+/* ===== ASK AI ===== */
+
+.ai-input {
+  display: flex;
+  gap: 10px;
+}
+
+.ai-input input {
+  flex: 1;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e0e6ef;
+  font-size: 15px;
+}
+
+.ai-input button {
+  background: linear-gradient(135deg,#4a90e2,#6b5cff);
+  border: none;
+  border-radius: 16px;
+  padding: 0 22px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(74,144,226,0.35);
+}
+
+.ai-magic-icon {
+  font-size: 28px;
+  margin-right: 8px;
+
+  /* GOLD → ORANGE PREMIUM GRADIENT */
+  background: linear-gradient(135deg,#ffd54f,#ff8a00,#ff3d00);
+
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  filter: drop-shadow(0 2px 6px rgba(255,140,0,0.4));
+}
+
+.analytics-swiper-wrap { overflow: hidden; width: 100%; }
+.analytics-slider { display: flex; transition: transform 0.35s ease-out; }
+.analytics-page { min-width: 100%; box-sizing: border-box; }
+.kpi-display-card { background: #fafafa; }
+
+.iphone-13-wrapper {
+    width: var(--iphone-w);
+    height: var(--iphone-h);
+    background: #f5f5f5;
+    position: relative; /* CRITICAL: This traps the sidebar inside */
+    overflow: hidden;
+    border-radius: 50px;
+    box-shadow: 0 0 0 12px #333, 0 20px 50px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+}
+/* iOS Status Bar / Notch Area */
+.notch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 160px;
+    height: 30px;
+    background: #333;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    z-index: 1000;
+}
+
+.viewport-scroll, 
+.sidebar {
+    -ms-overflow-style: none;  /* Hides scrollbar for Internet Explorer and Edge */
+    scrollbar-width: none;     /* Hides scrollbar for Firefox */
+}
+
+/* 2. Target Chrome, Safari, and newer Edge versions */
+.viewport-scroll::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar {
+    display: none;             /* This hides the scrollbar entirely */
+}
+/* Scrollable container for the app content */
+.viewport-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* Ensures smooth scrolling on mobile devices */
+    padding-bottom: 20px; /* Prevents content from being cut off at the bottom */
+}
+
+/* --- New Compact Payroll Styles --- */
+.payroll-period-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.period-card-modern {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.period-card-modern:active {
+    transform: scale(0.98);
+}
+
+.period-card-modern::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+.period-status-finalized::before { background: #10b981; }
+.period-status-unfinalized::before { background: #ef4444; }
+
+.period-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.period-date {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.status-pill {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-pill.final { background: #ecfdf5; color: #059669; }
+.status-pill.unfinal { background: #fef2f2; color: #dc2626; }
+
+.period-stats-grid {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top: 1px solid #f8fafc;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.total-pay-bar {
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 10px;
+}
+
+.total-label { font-size: 12px; font-weight: 600; color: #64748b; }
+.total-amount { font-size: 15px; font-weight: 800; color: #1e293b; }
+
+
+/* Enhanced Chart Containers */
+.chart-card-modern {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.03);
+    border: 1px solid #f1f5f9;
+}
+
+.chart-header-compact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.chart-title-main {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1e293b;
+    letter-spacing: -0.3px;
+}
+
+/* Custom Select Styling */
+.modern-select {
+    appearance: none;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px 32px 8px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+}
+
+    </style>
+</head>
+<body>
+
+  
+    <div class="iphone-13-wrapper">
+        <div class="notch"></div>
+
+    <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+
+    <nav class="sidebar" id="sidebar">
+        <div class="user-profile">
+            <div class="profile-top">
+                <div class="logo-circle">A</div>
+                <div class="user-info">
+                    <h4>Growth Organization</h4>
+                    <p>tushar@altametrics.com</p>
+                    <p>Altametrics Growth</p>
+                    <p>99999</p>
+                </div>
+            </div>
+            <div class="timestamp">
+                <span class="material-icons-outlined" style="font-size: 12px;">schedule</span> Wed, Feb 18 1:23 P, America/Toronto
+            </div>
+        </div>
+
+        <ul class="menu-list">
+            <li>
+                <div class="menu-link" onclick="toggleSubmenu('home-sub', this)">
+                    <span class="material-icons-outlined">home</span> Home 
+                    <span class="material-icons-outlined arrow">expand_more</span>
+                </div>
+                <ul class="submenu" id="home-sub">
+                    <li class="submenu-item" onclick="switchTab('dashboard')">Dashboard</li>
+                    <li class="submenu-item" onclick="switchTab('alerts')">Alerts</li>
+                    <li class="submenu-item" onclick="switchTab('shift-mgmt')">Shift Mgmt</li>
+                    <li class="submenu-item" onclick="switchTab('requests')">Requests</li>
+                </ul>
+            </li>
+
+            <div class="menu-group-title">Manage</div>
+            <li>
+                <div class="menu-link" onclick="toggleSubmenu('emp-sub', this)">
+                    <span class="material-icons-outlined">people</span> Employees 
+                    <span class="material-icons-outlined arrow">expand_more</span>
+                </div>
+                <ul class="submenu" id="emp-sub">
+                    <li class="submenu-item">Employees</li>
+                    <li class="submenu-item">Pending Employees</li>
+                    <li class="submenu-item">Ignored Employees</li>
+                </ul>
+            </li>
+            <li>
+    <div class="menu-link" onclick="switchTab('punch-mgmt')">
+        <span class="material-icons-outlined">event_note</span> Punch Management
+    </div>
+</li>
+
+<li>
+    <div class="menu-link" onclick="switchTab('payroll-mgmt')">
+        <span class="material-icons-outlined">payments</span> Payroll Management
+    </div>
+</li>
+
+<li>
+    <div class="menu-link" onclick="switchTab('analytics')">
+        <span class="material-icons-outlined">analytics</span> Analytics
+    </div>
+</li>
+
+            <li>
+    <div class="menu-link" onclick="switchTab('ai-insights')">
+        <span class="material-icons-outlined">psychology</span> AI Insights
+    </div>
+</li>
+
+            <li><a class="menu-link"><span class="material-icons-outlined">location_on</span> Geo Location</a></li>
+
+            <div class="menu-group-title">Reports</div>
+            <li><a class="menu-link"><span class="material-icons-outlined">assignment_ind</span> Employee Violation Report</a></li>
+            <li><a class="menu-link"><span class="material-icons-outlined">calendar_today</span> Daily Punch Report</a></li>
+
+            <div class="menu-group-title">Communication</div>
+            <li><a class="menu-link"><span class="material-icons-outlined">groups</span> Contacts</a></li>
+            <li><a class="menu-link"><span class="material-icons-outlined">chat_bubble_outline</span> Chitchat</a></li>
+            <li><a class="menu-link"><span class="material-icons-outlined">campaign</span> Notes & Broadcast</a></li>
+
+            <div class="menu-group-title">Settings</div>
+            <li><a class="menu-link"><span class="material-icons-outlined">badge</span> Shared Device</a></li>
+            <li><a class="menu-link"><span class="material-icons-outlined">devices</span> Time Clock Devices</a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <div><span class="material-icons-outlined">settings</span> Settings</div>
+            <div class="logout-btn"><span class="material-icons-outlined">logout</span> Logout</div>
+        </div>
+    </nav>
+
+    <header class="app-header">
+        <div class="header-left">
+            <span id="backBtn"
+      class="material-icons-outlined menu-btn"
+      style="display:none"
+      onclick="goBackDashboard()">arrow_back</span>
+
+<span id="menuBtn"
+      class="material-icons-outlined menu-btn"
+      onclick="toggleMenu()">menu</span>
+            <span id="headerTitle" style="font-size: 18px; font-weight: 500;">Zip Clock</span>
+        </div>
+        <div class="header-right">
+            <span class="material-icons-outlined">chat_bubble_outline</span>
+            <span class="material-icons-outlined">location_on</span>
+        </div>
+    </header>
+
+<nav class="top-nav" id="home-tabs-nav">
+    <div class="nav-item" id="tab-dashboard" onclick="switchTab('dashboard')">
+        <span class="material-icons-outlined">dashboard</span>Dashboard
+    </div>
+    <div class="nav-item" id="tab-alerts" onclick="switchTab('alerts')">
+        <span class="material-icons-outlined">report_problem</span>Alerts
+    </div>
+    <div class="nav-item" id="tab-shift-mgmt" onclick="switchTab('shift-mgmt')">
+        <span class="material-icons-outlined">calendar_month</span>Shift Mgmt
+    </div>
+    <div class="nav-item" id="tab-requests" onclick="switchTab('requests')">
+        <span class="material-icons-outlined">grid_view</span>Requests
+    </div>
+</nav>
+
+    <div class="viewport-scroll">
+
+    <main class="content" id="main-content">
+        <div class="alert-card">
+            <div class="avatar-ds">DS</div>
+            <div class="alert-info">
+                <h5>Devin S</h5>
+                <div class="badge-start">Start Shift</div>
+            </div>
+            <div class="alert-right">
+                <span class="material-icons-outlined sad-face">sentiment_very_dissatisfied</span>
+                <span class="material-icons-outlined" style="color:#ccc">chevron_right</span>
+            </div>
+        </div>
+    </main>
+
+    </div>
+
+    <footer class="app-footer" id="app-footer">
+        <div class="footer-stat">
+            <span class="material-icons-outlined" style="color:#777">person_outline</span>
+            <div class="val">19.68 %</div>
+            <div class="label">Labor</div>
+        </div>
+        <div class="footer-stat">
+            <span class="material-icons-outlined">schedule</span>
+            <div class="val blue-text">4</div>
+            <div class="label blue-text">On Clock</div>
+        </div>
+        <div class="footer-stat">
+            <span class="material-icons-outlined">coffee</span>
+            <div class="val blue-text">0</div>
+            <div class="label blue-text">On Break</div>
+        </div>
+    </footer>
+
+    <div style="height: 25px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 8px;">
+            <div style="width: 130px; height: 5px; background: rgba(0,0,0,0.1); border-radius: 10px;"></div>
+        </div>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('open');
+            overlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
+        }
+
+        function toggleSubmenu(id, el) {
+            const sub = document.getElementById(id);
+            const isVisible = sub.style.display === 'block';
+            sub.style.display = isVisible ? 'none' : 'block';
+            el.classList.toggle('expanded');
+        }
+
+function switchTab(tabName) {
+    // 1. Define which tabs belong to the "Home" group
+    const homeTabs = ['dashboard', 'alerts', 'shift-mgmt', 'requests'];
+    const homeNav = document.getElementById('home-tabs-nav');
+
+    // 2. Control visibility of the top navigation bar
+    if (homeNav) {
+        if (homeTabs.includes(tabName)) {
+            homeNav.style.display = 'flex';
+        } else {
+            homeNav.style.display = 'none';
+        }
+    }
+
+    // 3. Update Active Tab UI
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const activeTab = document.getElementById('tab-' + tabName);
+    if (activeTab) activeTab.classList.add('active');
+
+    // 4. Handle Footer Visibility (Only for Alerts and Shift Mgmt)
+    const footer = document.getElementById('app-footer');
+    if (footer) {
+        if (tabName === 'alerts' || tabName === 'shift-mgmt') {
+            footer.style.display = 'grid';
+        } else {
+            footer.style.display = 'none';
+        }
+    }
+
+    // 5. Update Content Placeholder
+    const main = document.getElementById('main-content');
+    if (tabName === 'dashboard') {
+        main.innerHTML = `
+        <div id="sortable-dashboard" style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="draggable-container" draggable="true" id="drag-workforce">
+                <div class="hero-card" style="margin-top:0; padding:18px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                        <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+                            <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">badge</span>
+                        </div>
+                        <div class="hero-title" style="font-size:18px; font-weight:800; color:#1c2434; letter-spacing: -0.3px;">
+                            Workforce Status
+                        </div>
+                    </div>
+                    <div class="hero-slider-wrap">
+                        <div class="hero-slider" id="heroSlider">
+                            <div class="hero-page">
+                                <div class="hero-stat stat-green" onclick="openTilePage('clockedIn')">
+                                    <span class="material-icons-outlined">groups</span>
+                                    <div class="hero-num">${workforceData.clockedIn.length}</div>
+                                    <div class="hero-label">Clocked In</div>
+                                </div>
+                                <div class="hero-stat stat-yellow" onclick="openTilePage('onBreak')">
+                                    <span class="material-icons-outlined">coffee</span>
+                                    <div class="hero-num">${workforceData.onBreak.length}</div>
+                                    <div class="hero-label">On Break</div>
+                                </div>
+                                <div class="hero-stat stat-red" onclick="openTilePage('missing')">
+                                    <span class="material-icons-outlined">person_off</span>
+                                    <div class="hero-num">${workforceData.missing.length}</div>
+                                    <div class="hero-label">Missing</div>
+                                </div>
+                            </div>
+                            <div class="hero-page">
+                                <div class="hero-stat stat-purple" onclick="openTilePage('overtime')">
+                                    <span class="material-icons-outlined">local_fire_department</span>
+                                    <div class="hero-num">${workforceData.overtime.length}</div>
+                                    <div class="hero-label">Overtime</div>
+                                </div>
+                                <div class="hero-stat stat-blue" onclick="openTilePage('exceptions')">
+                                    <span class="material-icons-outlined">warning</span>
+                                    <div class="hero-num">${workforceData.exceptions.length}</div>
+                                    <div class="hero-label">Exceptions</div>
+                                </div>
+                                <div class="hero-stat stat-green" onclick="openTilePage('compliant')">
+                                    <span class="material-icons-outlined">done_all</span>
+                                    <div class="hero-num">${workforceData.compliant.length}</div>
+                                    <div class="hero-label">Compliant</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hero-dots" style="margin-top:14px;">
+                        <div class="hero-dot active" onclick="goHeroPage(0)"></div>
+                        <div class="hero-dot" onclick="goHeroPage(1)"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="draggable-container" draggable="true" id="drag-shift-health">
+                <div class="section-card" style="background: #fff; border-left: 6px solid #ff5252; margin-top: 0; padding: 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+                                <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">health_and_safety</span>
+                            </div>
+                            <h4 style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">Shift Health</h4>
+                        </div>
+                        <span style="font-size: 11px; background: #fff1f0; color: #ff5252; padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 1px solid #ffccc7; letter-spacing: 0.5px;">2 ACTIONS REQUIRED</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="display: flex; align-items: center; gap: 14px; background: #fafafa; padding: 14px; border-radius: 14px; border: 1px solid #f0f0f0;">
+                            <div style="background: #fff8eb; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <span class="material-icons-outlined" style="color: #ff8a00; font-size: 24px;">timer</span>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 14px; font-weight: 800; color: #1c2434;">Minor: Lucas H.</div>
+                                <div style="font-size: 13px; color: #777;">Must clock out in <b style="color: #ff8a00;">18 mins</b></div>
+                            </div>
+                            <button style="background: #4a90e2; color: white; border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(74,144,226,0.2);">Notify</button>
+                        </div>
+                        <div onclick="openApproachingOT()" style="display: flex; align-items: center; gap: 14px; background: #fafafa; padding: 14px; border-radius: 14px; border: 1px solid #f0f0f0; cursor: pointer; transition: all 0.2s ease;">
+                            <div style="background: #fff1f0; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <span class="material-icons-outlined" style="color: #ff5252; font-size: 24px;">trending_up</span>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 14px; font-weight: 700; color: #1c2434;">Approaching OT</div>
+                                <div style="font-size: 12px; color: #777;"><b style="color: #ff5252;">${workforceData.overtime.length}</b> Employees reaching limits</div>
+                            </div>
+                            <span class="material-icons-outlined" style="color: #ccc; font-size: 22px;">chevron_right</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="draggable-container" draggable="true" id="drag-operational-context">
+                <div class="section-card" style="margin-top: 0; padding: 18px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                        <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+                            <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">info</span>
+                        </div>
+                        <div class="section-title" style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">
+                            Operational Context
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 14px; align-items: stretch;">
+                        <div onclick="openWeatherDetails()" style="flex: 1; cursor: pointer; background: linear-gradient(135deg, #4a90e2, #63a4ff); border-radius: 16px; padding: 14px; color: white; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="material-icons-outlined" style="font-size: 36px;">cloud</span>
+                                <b style="font-size: 20px;">18°C</b>
+                            </div>
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600;">Mostly Cloudy</div>
+                                <div style="font-size: 13px; opacity: 0.9; display: flex; align-items: center; gap: 4px;">
+                                    View Forecast <span class="material-icons-outlined" style="font-size: 12px;">arrow_forward</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="flex: 1.5; background: #fff; border: 1px solid #eee; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                            <div style="display: flex; align-items: center; gap: 6px; color: #ff8a00;">
+                                <span class="material-icons-outlined" style="font-size: 18px;">event</span>
+                                <span style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Local Event Today</span>
+                            </div>
+                            <div style="font-size: 14px; font-weight: 700; color: #1c2434;">High School Football Game</div>
+                            <div style="font-size: 13px; font-weight: 500; color: #777;">Expect heavy rush: 6:00 PM - 9:00 PM</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="draggable-container" draggable="true" id="drag-labor-budget">
+                <div class="section-card" style="background: #ffffff; margin-top: 0; border-radius: 24px; padding: 22px; box-shadow: 0 12px 30px rgba(0,0,0,0.04); border: 1px solid #f1f5f9;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: #4a90e2; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);">
+                                <span class="material-icons-outlined" style="font-size: 22px; color: #fff;">analytics</span>
+                            </div>
+                            <div>
+                                <span style="font-size: 17px; font-weight: 800; color: #1c2434; letter-spacing: -0.3px; display: block;">Budget Burn</span>
+                                <div id="laborViewLabel" style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Live Tracking</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div onclick="openEditLabor()" style="background: #f0f7ff; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #e0efff;">
+                                <span class="material-icons-outlined" style="font-size: 18px; color: #4a90e2;">tune</span>
+                            </div>
+                            <div id="laborSelectors" style="display: flex; background: #f8fafc; padding: 3px; border-radius: 10px; border: 1px solid #f1f5f9;">
+                                <button onclick="updateLaborView('Daily', this)" class="labor-sel active" style="border:none; background:#fff; font-size:10px; padding:6px 10px; border-radius:7px; font-weight:800; color:#4a90e2; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor:pointer;">D</button>
+                                <button onclick="updateLaborView('Weekly', this)" class="labor-sel" style="border:none; background:transparent; font-size:10px; padding:6px 10px; color:#94a3b8; font-weight:700; cursor:pointer;">W</button>
+                                <button onclick="updateLaborView('Pay Period', this)" class="labor-sel" style="border:none; background:transparent; font-size:10px; padding:6px 10px; color:#94a3b8; font-weight:700; cursor:pointer;">P</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px;">
+                        <div>
+                            <div style="font-size: 30px; font-weight: 900; color: #1c2434; letter-spacing: -0.8px; line-height: 1;">$1,476</div>
+                            <div style="font-size: 13px; color: #64748b; font-weight: 500; margin-top: 6px;">Limit <span id="currentLimitDisplay" style="color: #1c2434; font-weight: 700;">$1,800</span></div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div id="percentDisplay" style="font-size: 18px; color: #ff8a00; font-weight: 800;">82%</div>
+                            <div style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Budget Used</div>
+                        </div>
+                    </div>
+                    <div style="height:10px; background:#f1f5f9; border-radius:10px; overflow:hidden; position: relative;">
+                        <div id="laborProgressBar" style="width:82%; height:100%; background-image: linear-gradient(to right, #20c997 0%, #20c997 60%, #ff8a00 80%, #ff5252 100%); background-size: 300px 100%; border-radius:10px; transition: width 0.8s ease-in-out;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="draggable-container" draggable="true" id="drag-actions">
+                <div class="section-card" style="margin-top: 0; padding: 18px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                        <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+                            <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">fact_check</span>
+                        </div>
+                        <div class="section-title" style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">Need Actions</div>
+                    </div>
+                    <div class="action-grid-need" style="gap: 12px;">
+                        <div class="action-tile-need" onclick="switchTab('requests')" style="padding: 14px;">
+                            <div class="action-icon icon-red" style="width: 42px; height: 42px;"><span class="material-icons-outlined" style="font-size: 20px;">fact_check</span></div>
+                            <div class="action-info">
+                                <div class="action-name" style="font-size: 14px;">Punch Approval</div>
+                                <div class="action-count" style="font-size: 13px;">${actionData.punchApproval} pending</div>
+                            </div>
+                        </div>
+                        <div class="action-tile-need" onclick="switchTab('requests')" style="padding: 14px;">
+                            <div class="action-icon icon-orange" style="width: 42px; height: 42px;"><span class="material-icons-outlined" style="font-size: 20px;">error_outline</span></div>
+                            <div class="action-info">
+                                <div class="action-name" style="font-size: 14px;">Unbalanced Punches</div>
+                                <div class="action-count" style="font-size: 13px;">${actionData.unbalancedPunches} issues</div>
+                            </div>
+                        </div>
+                        <div class="action-tile-need" onclick="switchTab('requests')" style="padding: 14px;">
+                            <div class="action-icon icon-amber" style="width: 42px; height: 42px;"><span class="material-icons-outlined" style="font-size: 20px;">coffee</span></div>
+                            <div class="action-info">
+                                <div class="action-name" style="font-size: 14px;">Suggest Break</div>
+                                <div class="action-count" style="font-size: 13px;">${actionData.suggestBreak} employees</div>
+                            </div>
+                        </div>
+                        <div class="action-tile-need" onclick="switchTab('requests')" style="padding: 14px;">
+                            <div class="action-icon icon-blue" style="width: 42px; height: 42px;"><span class="material-icons-outlined" style="font-size: 20px;">logout</span></div>
+                            <div class="action-info">
+                                <div class="action-name" style="font-size: 14px;">Suggest Clock Out</div>
+                                <div class="action-count" style="font-size: 13px;">${actionData.suggestClockOut} employees</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="draggable-container" draggable="true" id="drag-insights">
+                <div class="graph-card" style="margin-top: 0; padding: 18px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                        <div style="background: #f0f7ff; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #e0efff;">
+                            <span class="material-icons-outlined" style="font-size: 22px; color: #4a90e2;">insights</span>
+                        </div>
+                        <div class="graph-title" style="font-size: 18px; font-weight: 800; color: #1c2434; margin: 0; letter-spacing: -0.3px;">Insights</div>
+                    </div>
+                    <div class="graph-slider-wrap">
+                        <div class="graph-slider" id="graphSlider">
+                            <div class="graph-page"><div class="graph-tile"><canvas id="deptChart"></canvas></div></div>
+                            <div class="graph-page"><div class="graph-tile"><canvas id="punchChart"></canvas></div></div>
+                            <div class="graph-page"><div class="graph-tile"><canvas id="otChart"></canvas></div></div>
+                            <div class="graph-page"><div class="graph-tile"><canvas id="issueChart"></canvas></div></div>
+                        </div>
+                    </div>
+                    <div class="graph-dots" style="margin-top: 14px;">
+                        <div class="graph-dot active" onclick="goGraphPage(0)"></div>
+                        <div class="graph-dot" onclick="goGraphPage(1)"></div>
+                        <div class="graph-dot" onclick="goGraphPage(2)"></div>
+                        <div class="graph-dot" onclick="goGraphPage(3)"></div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        initHeroSlider();
+        initGraphs();
+        initGraphSwipe();
+        initDragAndDrop();
+    } else if (tabName === 'alerts') {
+        main.innerHTML = `
+        <div class="alert-card">
+            <div class="avatar-ds">DS</div>
+            <div class="alert-info">
+                <h5>Devin S</h5>
+                <div class="badge-start">Start Shift</div>
+            </div>
+            <div class="alert-right">
+                <span class="material-icons-outlined sad-face">sentiment_very_dissatisfied</span>
+                <span class="material-icons-outlined" style="color:#ccc">chevron_right</span>
+            </div>
+        </div>`;
+    } else if (tabName === 'shift-mgmt') {
+        main.innerHTML = `
+        <div class="tab-container">
+            <div class="tab-grid">
+                <div class="card-unit">
+                    <div class="count-badge">${actionData.suggestBreak}</div>
+                    <div class="card-content">
+                        <span class="material-icons-outlined">coffee</span>
+                        <div class="card-desc">Employee(s) need<br>a Break</div>
+                    </div>
+                    <div class="card-banner">Suggest Break</div>
+                </div>
+                <div class="card-unit">
+                    <div class="count-badge">${actionData.suggestClockOut}</div>
+                    <div class="card-content">
+                        <span class="material-icons-outlined">schedule</span>
+                        <div class="card-desc">Employee(s) need to<br>Clock Out</div>
+                    </div>
+                    <div class="card-banner">Suggest Clock Out</div>
+                </div>
+                <div class="card-unit">
+                    <div class="count-badge">${workforceData.missing.length}</div>
+                    <div class="card-content">
+                        <span class="material-icons-outlined">help_outline</span>
+                        <div class="card-desc">Employee(s) does not<br>show up</div>
+                    </div>
+                    <div class="card-banner">Missing Employees</div>
+                </div>
+                <div class="card-unit">
+                    <div class="count-badge">3</div>
+                    <div class="card-content">
+                        <span class="material-icons-outlined">phone_in_talk</span>
+                        <div class="card-desc">Employee(s) available to<br>fill in</div>
+                    </div>
+                    <div class="card-banner">Call Employees</div>
+                </div>
+            </div>
+        </div>`;
+    } else if (tabName === 'requests') {
+        main.innerHTML = `
+        <div class="request-container">
+            <div class="invite-btn-top">
+                <span class="material-icons-outlined">link</span> Invite Employees
+            </div>
+            <div class="req-section-title">Needing Action</div>
+            <div class="req-grid">
+                <div class="req-card">
+                    <div class="count-bubble">${actionData.punchApproval}</div>
+                    <div class="req-card-body">
+                        <span class="material-icons-outlined">fingerprint</span>
+                        <div class="req-card-label">Punches to Approve</div>
+                    </div>
+                    <div class="req-card-footer">Punch Approvals</div>
+                </div>
+                <div class="req-card">
+                    <div class="count-bubble">${actionData.unbalancedPunches}</div>
+                    <div class="req-card-body">
+                        <span class="material-icons-outlined">error_outline</span>
+                        <div class="req-card-label">Punches to Balance</div>
+                    </div>
+                    <div class="req-card-footer">Unbalanced Punches</div>
+                </div>
+            </div>
+            <div class="req-section-title">Awaiting Action From Others</div>
+            <div class="req-grid">
+                <div class="req-card">
+                    <div class="count-bubble">${actionData.suggestBreak}</div>
+                    <div class="req-card-body">
+                        <span class="material-icons-outlined">coffee</span>
+                        <div class="req-card-label">Employees to take a Break</div>
+                    </div>
+                    <div class="req-card-footer">Suggest Break</div>
+                </div>
+                <div class="req-card">
+                    <div class="count-bubble">${actionData.suggestClockOut}</div>
+                    <div class="req-card-body">
+                        <span class="material-icons-outlined">schedule</span>
+                        <div class="req-card-label">Employees to Clock Out</div>
+                    </div>
+                    <div class="req-card-footer">Suggest Clock Out</div>
+                </div>
+            </div>
+            <div class="req-grid" style="grid-template-columns: 1fr;">
+                <div class="req-card" style="width: calc(50% - 6px);">
+                    <div class="count-bubble">${actionData.needAcknowledgment}</div>
+                    <div class="req-card-body">
+                        <span class="material-icons-outlined">person_search</span>
+                        <div class="req-card-label">Pending Punch to Acknowledge</div>
+                    </div>
+                    <div class="req-card-footer">Need Acknowledgement</div>
+                </div>
+            </div>
+        </div>`;
+    } else if (tabName === 'punch-mgmt') {
+        main.innerHTML = `
+        <div class="punch-mgmt-container">
+            <div class="calendar-bar">
+                <span class="material-icons-outlined">chevron_left</span>
+                <span class="material-icons-outlined">calendar_today</span>
+                <div class="date-range-text">Feb 16 '26 - Feb 22 '26</div>
+                <span class="material-icons-outlined">arrow_drop_down</span>
+                <span class="material-icons-outlined">chevron_right</span>
+            </div>
+            <div class="hero-card" style="margin-top: 10px;">
+                <div class="hero-slider-wrap">
+                    <div class="hero-slider" id="punchHeroSlider">
+                        <div class="hero-page">
+                            <div class="hero-stat stat-blue" onclick="openKpiDetail('Total Labor $')">
+                                <div class="hero-num">$4,250</div>
+                                <div class="hero-label">Total Labor $</div>
+                            </div>
+                            <div class="hero-stat stat-green" onclick="openKpiDetail('Actual Hrs')">
+                                <div class="hero-num">168.5</div>
+                                <div class="hero-label">Actual Hrs</div>
+                            </div>
+                            <div class="hero-stat stat-red" onclick="openKpiDetail('Overtime')">
+                                <div class="hero-num">12.2</div>
+                                <div class="hero-label">Overtime</div>
+                            </div>
+                        </div>
+                        <div class="hero-page">
+                            <div class="hero-stat stat-yellow" onclick="openKpiDetail('Total Warning')">
+                                <div class="hero-num">8</div>
+                                <div class="hero-label">Total Warning</div>
+                            </div>
+                            <div class="hero-stat stat-purple" onclick="openKpiDetail('Ideal Hrs')">
+                                <div class="hero-num">160.0</div>
+                                <div class="hero-label">Ideal Hrs</div>
+                            </div>
+                            <div class="hero-stat stat-blue" onclick="openKpiDetail('Labor $')">
+                                <div class="hero-num">$3,800</div>
+                                <div class="hero-label">Labor $</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-dots">
+                    <div class="hero-dot active" onclick="goPunchHeroPage(0)"></div>
+                    <div class="hero-dot" onclick="goPunchHeroPage(1)"></div>
+                </div>
+            </div>
+            <div class="filter-btn-wrap" style="display: flex; justify-content: space-between; align-items: center; padding: 0 5px;">
+                <div class="filter-pill" onclick="toggleFilterModal(true)">
+                    <span class="material-icons-outlined">tune</span> Filter
+                </div>
+                <div class="filter-pill" onclick="openKpiMainScreen()" style="border-color: #4a90e2; color: #4a90e2; font-weight: 700;">
+                    <span class="material-icons-outlined">insights</span> KPIs
+                </div>
+            </div>
+            <div id="punchEmployeeList">
+                ${renderPunchRow('Adam', 'A', '#c56a6a', '08.00 Hours', '$ 120.00', '')}
+                ${renderPunchRow('Aiden', 'A', '#1a1aff', '06.50 Hours', '$ 97.50', 'M')}
+                ${renderPunchRow('John', 'J', '#20c997', '07.25 Hours', '$ 108.75', 'S')}
+                ${renderPunchRow('Bravo', 'B', '#5a1a5a', '00.00 Hours', '$ 0.00', '')}
+                ${renderPunchRow('Marco', 'M', '#20c997', '08.50 Hours', '$ 188.25', 'S')}
+            </div>
+            <div style="padding: 20px 0;">
+                <button class="btn-apply" style="width: 100%; border-radius: 25px; padding: 15px;">Proceed to payroll</button>
+            </div>
+        </div>
+        <div class="modal-overlay" id="modalOverlay" onclick="toggleFilterModal(false)"></div>
+        <div class="filter-modal" id="filterModal">
+            <div class="modal-header">
+                <h4 style="font-weight: 800;">Filters</h4>
+                <span class="material-icons-outlined" onclick="toggleFilterModal(false)" style="cursor:pointer;">close</span>
+            </div>
+            <div class="filter-group">
+                <h6>Highlight Punch For</h6>
+                <div class="checkbox-item"><input type="checkbox" checked> Show All</div>
+                <div class="checkbox-item"><input type="checkbox" checked> Authorized Punches</div>
+                <div class="checkbox-item"><input type="checkbox" checked> Un-Authorized Punch</div>
+            </div>
+            <div class="filter-group">
+                <h6>Violations</h6>
+                <div class="checkbox-item"><input type="checkbox" checked> Show All</div>
+                <div class="checkbox-item"><input type="checkbox" checked> Compliant Punches</div>
+                <div class="checkbox-item"><input type="checkbox" checked> Violated Punches</div>
+                <div class="checkbox-item"><input type="checkbox" checked> Mismatch Punches</div>
+            </div>
+            <div class="filter-group">
+                <h6>Job Codes</h6>
+                <div class="checkbox-item"><input type="checkbox" checked> All Job Codes</div>
+                <div class="checkbox-item"><input type="checkbox" checked> Crew</div>
+                <div class="checkbox-item"><input type="checkbox" checked> MGR TRAINEE</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-clear">Clear</button>
+                <button class="btn-apply" onclick="toggleFilterModal(false)">Apply</button>
+            </div>
+        </div>`;
+        initPunchHeroSlider();
+    } else if (tabName === 'ai-insights') {
+        main.innerHTML = `
+        <div class="ai-container">
+            <div class="ai-hero">
+                <div class="ai-hero-title">
+                    <span class="material-icons-outlined ai-magic-icon">auto_fix_high</span>
+                    AI Summary
+                </div>
+                <div class="ai-summary-text">
+                    Labor trending <b>8% above target</b>.  
+                    Dinner rush expected <b>6–9 PM</b> due to local event.  
+                    Overtime risk detected for 2 employees.
+                </div>
+            </div>
+            <div class="ai-card">
+                <div class="ai-section-title">Priority Actions</div>
+                <div class="ai-action">
+                    <div class="ai-action-icon icon-danger"><span class="material-icons-outlined">trending_up</span></div>
+                    Overtime risk in 42 minutes <button>View</button>
+                </div>
+                <div class="ai-action">
+                    <div class="ai-action-icon icon-warn"><span class="material-icons-outlined">schedule</span></div>
+                    Minor must clock out soon <button>Notify</button>
+                </div>
+                <div class="ai-action">
+                    <div class="ai-action-icon icon-info"><span class="material-icons-outlined">person_off</span></div>
+                    Missing employee detected <button>Call</button>
+                </div>
+            </div>
+            <div class="ai-card">
+                <div class="ai-section-title">Predictive Forecast</div>
+                <div class="ai-forecast-grid">
+                    <div class="ai-forecast-tile tile-sales"><div class="ai-big">$5.2K</div>Sales Forecast</div>
+                    <div class="ai-forecast-tile tile-staff"><div class="ai-big">+3 Staff</div>Needed at Peak</div>
+                    <div class="ai-forecast-tile tile-labor"><div class="ai-big">22%</div>Labor Projection</div>
+                </div>
+            </div>
+            <div class="ai-card">
+                <div class="ai-section-title">Smart Recommendations</div>
+                <div class="ai-rec">Send John on break now to avoid overtime (saves ~$42)</div>
+                <div class="ai-rec">Call 1 employee for dinner rush coverage</div>
+                <div class="ai-rec">Reassign cashier to kitchen from 6–7 PM</div>
+            </div>
+        </div>`;
+    } else if (tabName === 'analytics') {
+        main.innerHTML = `
+        <div class="analytics-container" style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="section-card" style="padding: 15px; background: #fff;">
+                <div class="section-title">Daily Performance</div>
+                <div class="analytics-swiper-wrap">
+                    <div class="analytics-slider" id="dailySlider">
+                        <div class="analytics-page">${renderKPI("Actual Vs Needed", "-44:58", "151:02", "196:00", "Actual Hours", "Needed Hours", "red")}<div class="graph-tile"><canvas id="dailyGraph1"></canvas></div></div>
+                        <div class="analytics-page">${renderKPI("Actual Vs Schedule", "-142:28", "151:02", "293:30", "Actual Hours", "Sched. Hours", "red")}<div class="graph-tile"><canvas id="dailyGraph2"></canvas></div></div>
+                        <div class="analytics-page">${renderKPI("Potential Time Loss", "1,732:00", "75:00", "1,237:00", "Early ClockIn", "Late ClockIn", "blue")}<div class="graph-tile"><canvas id="dailyGraph3"></canvas></div></div>
+                        <div class="analytics-page">${renderKPI("Potential Financial Loss", "$274.10", "$49.00", "$68.00", "OT Loss", "Break Loss", "blue")}<div class="graph-tile"><canvas id="dailyGraph4"></canvas></div></div>
+                    </div>
+                </div>
+                <div class="graph-dots">
+                    <div class="graph-dot active" onclick="goAnalyticsPage('daily', 0)"></div>
+                    <div class="graph-dot" onclick="goAnalyticsPage('daily', 1)"></div>
+                    <div class="graph-dot" onclick="goAnalyticsPage('daily', 2)"></div>
+                    <div class="graph-dot" onclick="goAnalyticsPage('daily', 3)"></div>
+                </div>
+            </div>
+            <div class="section-card" style="padding: 15px; background: #fff;">
+                <div class="section-title">Week To Date Performance</div>
+                <div class="analytics-swiper-wrap">
+                    <div class="analytics-slider" id="weeklySlider">
+                        <div class="analytics-page">${renderKPI("Actual Vs Needed", "-907:41", "635:49", "1543:30", "Actual Hours", "Needed Hours", "red")}<div class="graph-tile"><canvas id="weeklyGraph1"></canvas></div></div>
+                        <div class="analytics-page">${renderKPI("Actual Vs Schedule", "-1725:11", "635:49", "2361:00", "Actual Hours", "Sched. Hours", "red")}<div class="graph-tile"><canvas id="weeklyGraph2"></canvas></div></div>
+                        <div class="analytics-page">${renderKPI("Potential Time Loss", "2,542:00", "75:00", "1,237:00", "Early ClockIn", "Late ClockIn", "blue")}<div class="graph-tile"><canvas id="weeklyGraph3"></canvas></div></div>
+                        <div class="analytics-page">${renderKPI("Potential Financial Loss", "$410.60", "$117.25", "$87.25", "OT Loss", "Break Loss", "blue")}<div class="graph-tile"><canvas id="weeklyGraph4"></canvas></div></div>
+                    </div>
+                </div>
+                <div class="graph-dots">
+                    <div class="graph-dot active" onclick="goAnalyticsPage('weekly', 0)"></div>
+                    <div class="graph-dot" onclick="goAnalyticsPage('weekly', 1)"></div>
+                    <div class="graph-dot" onclick="goAnalyticsPage('weekly', 2)"></div>
+                    <div class="graph-dot" onclick="goAnalyticsPage('weekly', 3)"></div>
+                </div>
+            </div>
+        </div>`;
+        initAnalyticsGraphs();
+        initAnalyticsSwipe();
+    } else if (tabName === 'payroll-mgmt') {
+        renderPayrollLanding();
+    } else {
+        main.innerHTML = `<h3>${tabName.replace('-',' ').toUpperCase()}</h3><p>Placeholder content...</p>`;
+    }
+
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) toggleMenu();
+}
+
+        // Initialize state
+       window.onload = () => {
+
+    // ✅ Default landing page
+    switchTab('dashboard');
+
+    // Keep Home submenu open
+    document.getElementById('home-sub').style.display = 'block';
+    document.querySelector('.menu-link').classList.add('expanded');
+    preloadEmployeePhotos();
+
+};
+
+let heroIndex = 0;
+
+function goHeroPage(i) {
+
+  const slider = document.getElementById("heroSlider");
+  const dots = document.querySelectorAll(".hero-dot");
+
+  heroIndex = i;
+  slider.style.transform = `translateX(-${i * 100}%)`;
+
+  dots.forEach(d => d.classList.remove("active"));
+  dots[i].classList.add("active");
+}
+
+function initHeroSlider() {
+
+  const slider = document.getElementById("heroSlider");
+  let startX = 0;
+
+  slider.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+  });
+
+  slider.addEventListener("touchend", e => {
+
+    const diff = startX - e.changedTouches[0].clientX;
+
+    if (Math.abs(diff) > 50) {
+
+      if (diff > 0 && heroIndex < 1) heroIndex++;
+      if (diff < 0 && heroIndex > 0) heroIndex--;
+
+      goHeroPage(heroIndex);
+    }
+
+  });
+
+}
+
+let currentDashboardHTML = "";
+
+function openTilePage(type) {
+
+  const main = document.getElementById("main-content");
+
+  // Save dashboard content
+  currentDashboardHTML = main.innerHTML;
+
+  // Update header
+  document.getElementById("headerTitle").textContent = getTileTitle(type);
+
+  // Show back button
+  document.getElementById("backBtn").style.display = "inline";
+  document.getElementById("menuBtn").style.display = "none";
+
+  // Render relevant page
+  main.innerHTML = getTilePageContent(type);
+}
+
+function goBackDashboard() {
+  const main = document.getElementById("main-content");
+
+  main.innerHTML = currentDashboardHTML;
+
+  document.getElementById("headerTitle").textContent = "Zip Clock";
+
+  document.getElementById("backBtn").style.display = "none";
+  document.getElementById("menuBtn").style.display = "inline";
+
+  // ⭐ RE-INITIALIZE GRAPHS AND SWIPER HERE
+  initHeroSlider(); 
+  initGraphs();
+  initGraphSwipe();
+}
+
+function getTileTitle(type) {
+
+  const titles = {
+    clockedIn: "Clocked In Employees",
+    onBreak: "Employees On Break",
+    missing: "Missing Employees",
+    overtime: "Overtime Employees",
+    exceptions: "Exceptions",
+    compliant: "Compliant Employees"
+  };
+
+  return titles[type] || "Details";
+}
+
+function getTilePageContent(type) {
+
+  const list = workforceData[type] || [];
+
+  if (!list.length) {
+    return `<p>No employees</p>`;
+  }
+
+  const badgeMap = {
+    clockedIn: ["badge-green","Active"],
+    onBreak: ["badge-yellow","On Break"],
+    missing: ["badge-red","Not Clocked In"],
+    overtime: ["badge-purple","Overtime"],
+    exceptions: ["badge-blue","Exception"],
+    compliant: ["badge-green","OK"]
+  };
+
+  const [badgeClass, badgeText] = badgeMap[type] || ["badge-blue","Status"];
+
+  const cards = list.map(emp =>
+    empCard(emp.name, emp.sub, emp.init, badgeClass, badgeText)
+  ).join("");
+
+  const titles = {
+    clockedIn: "Currently Clocked In",
+    onBreak: "Employees On Break",
+    missing: "Missing Employees",
+    overtime: "Overtime Employees",
+    exceptions: "Exceptions Today",
+    compliant: "Fully Compliant"
+  };
+
+  return `
+    <div class="page-title">${titles[type]}</div>
+    <div class="emp-list">${cards}</div>
+  `;
+}
+
+// Add this helper function at the top of your <script>
+const getAvatarUrl = (name) => `https://i.pravatar.cc/150?u=${name.replace(/\s/g, '')}`;
+
+// This function pre-loads the images into the browser cache
+function preloadEmployeePhotos() {
+    Object.values(workforceData).forEach(category => {
+        category.forEach(emp => {
+            const img = new Image();
+            img.src = getAvatarUrl(emp.name);
+            // Storing the URL directly in the data object for instant access
+            emp.photo = img.src; 
+        });
+    });
+}
+
+
+function empCard(name, sub, initials, badgeClass, badgeText) {
+  // Find the employee in our data to get their cached photo
+  const empEntry = Object.values(workforceData).flat().find(e => e.name === name);
+  const avatarUrl = empEntry ? empEntry.photo : getAvatarUrl(name);
+
+  return `
+    <div class="emp-card" style="position: relative; cursor: pointer;">
+      <div class="emp-avatar" style="overflow: hidden; background: #eee; border: 1px solid rgba(0,0,0,0.05);">
+        <img src="${avatarUrl}" 
+             alt="${name}" 
+             style="width: 100%; height: 100%; object-fit: cover;"
+             onload="this.style.opacity='1'"
+             style="opacity: 0; transition: opacity 0.2s ease;">
+      </div>
+
+      <div class="emp-info">
+        <div class="emp-name" style="font-weight: 700;">${name}</div>
+        <div class="emp-sub">${sub}</div>
+      </div>
+
+      <div class="emp-badge ${badgeClass}">
+        ${badgeText}
+      </div>
+    </div>
+  `;
+}
+
+/* ===== Workforce Data ===== */
+
+const workforceData = {
+
+  clockedIn: [
+    { name:"John Smith", sub:"Clocked in at 9:02 AM", init:"JS" },
+    { name:"Maria Lopez", sub:"Clocked in at 10:15 AM", init:"ML" },
+    { name:"David Kim", sub:"Clocked in at 11:03 AM", init:"DK" },
+    { name:"Chris Miller", sub:"Clocked in at 11:20 AM", init:"CM" },
+    { name:"Sophia White", sub:"Clocked in at 12:01 PM", init:"SW" },
+    { name:"Daniel Lee", sub:"Clocked in at 12:18 PM", init:"DL" },
+    { name:"Olivia Brown", sub:"Clocked in at 12:45 PM", init:"OB" },
+    { name:"Liam Davis", sub:"Clocked in at 1:02 PM", init:"LD" },
+    { name:"Emma Wilson", sub:"Clocked in at 1:15 PM", init:"EW" },
+    { name:"Noah Garcia", sub:"Clocked in at 1:32 PM", init:"NG" },
+    { name:"Ava Taylor", sub:"Clocked in at 1:45 PM", init:"AT" },
+    { name:"James Anderson", sub:"Clocked in at 2:00 PM", init:"JA" },
+    { name:"Isabella Thomas", sub:"Clocked in at 2:10 PM", init:"IT" },
+    { name:"Benjamin Martin", sub:"Clocked in at 2:18 PM", init:"BM" },
+    { name:"Mia Jackson", sub:"Clocked in at 2:25 PM", init:"MJ" },
+    { name:"Lucas Harris", sub:"Clocked in at 2:30 PM", init:"LH" },
+    { name:"Charlotte Clark", sub:"Clocked in at 2:35 PM", init:"CC" },
+    { name:"Henry Lewis", sub:"Clocked in at 2:40 PM", init:"HL" }
+  ],
+
+  onBreak: [
+    { name:"Kevin Brown", sub:"Break started 1:12 PM", init:"KB" },
+    { name:"Sophia Lee", sub:"Break started 1:25 PM", init:"SL" },
+    { name:"Jack Hall", sub:"Break started 1:31 PM", init:"JH" }
+  ],
+
+  missing: [
+    { name:"Ethan Young", sub:"Shift started 12:00 PM", init:"EY" },
+    { name:"Grace King", sub:"Shift started 1:00 PM", init:"GK" }
+  ],
+
+  overtime: [
+    { name:"Chris Taylor", sub:"Worked 8h 32m today", init:"CT" }
+  ],
+
+  exceptions: [
+    { name:"Olivia Martin", sub:"Late Clock-In", init:"OM" },
+    { name:"Ethan Davis", sub:"Missed Punch", init:"ED" },
+    { name:"Logan Scott", sub:"Short Break", init:"LS" },
+    { name:"Zoe Adams", sub:"Early Clock-Out", init:"ZA" }
+  ],
+
+  compliant: [
+    { name:"Daniel White", sub:"No violations today", init:"DW" },
+    { name:"Sophia Brown", sub:"No issues", init:"SB" },
+    { name:"Lucas Green", sub:"All punches valid", init:"LG" },
+    { name:"Amelia Hill", sub:"Compliant", init:"AH" },
+    { name:"Matthew Baker", sub:"Compliant", init:"MB" },
+    { name:"Chloe Nelson", sub:"Compliant", init:"CN" },
+    { name:"Owen Carter", sub:"Compliant", init:"OC" },
+    { name:"Ella Mitchell", sub:"Compliant", init:"EM" },
+    { name:"Wyatt Perez", sub:"Compliant", init:"WP" },
+    { name:"Lily Roberts", sub:"Compliant", init:"LR" },
+    { name:"Sebastian Turner", sub:"Compliant", init:"ST" },
+    { name:"Scarlett Phillips", sub:"Compliant", init:"SP" }
+  ]
+
+};
+
+/* ===== Need Actions Data ===== */
+
+const actionData = {
+  punchApproval: 6,
+  unbalancedPunches: 3,
+  suggestBreak: 2,
+  suggestClockOut: 1,
+  needAcknowledgment: 4
+};
+
+let graphIndex = 0;
+const maxGraphPage = 3;
+
+function goGraphPage(i) {
+
+  const slider = document.getElementById("graphSlider");
+  const dots = document.querySelectorAll(".graph-dot");
+
+  graphIndex = i;
+  slider.style.transform = `translateX(-${i * 100}%)`;
+
+  dots.forEach(d => d.classList.remove("active"));
+  dots[i].classList.add("active");
+}
+
+/* Swipe support */
+
+function initGraphSwipe() {
+
+  const slider = document.getElementById("graphSlider");
+  let startX = 0;
+
+  slider.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+  });
+
+  slider.addEventListener("touchend", e => {
+
+    const diff = startX - e.changedTouches[0].clientX;
+
+    if (Math.abs(diff) > 50) {
+
+      if (diff > 0 && graphIndex < maxGraphPage) graphIndex++;
+      if (diff < 0 && graphIndex > 0) graphIndex--;
+
+      goGraphPage(graphIndex);
+    }
+
+  });
+
+}
+
+/* ===== Initialize Graphs ===== */
+
+function initGraphs() {
+
+  const deptChart = document.getElementById('deptChart');
+  const punchChart = document.getElementById('punchChart');
+  const otChart = document.getElementById('otChart');
+  const issueChart = document.getElementById('issueChart');
+
+  Chart.register(ChartDataLabels);
+
+  const cleanGrid = {
+    display: true,
+    drawBorder: false,
+    color: "rgba(0,0,0,0.05)"
+  };
+
+  const labelStyle = {
+    color: "#444",
+    font: { weight: "600", size: 11 }
+  };
+
+  /* ========= 1️⃣ Labor Hours by Department ========= */
+
+  new Chart(deptChart, {
+    type: "bar",
+    data: {
+      labels: ["Kitchen","Front","Drive","Admin"],
+      datasets: [{
+        data: [62,48,35,18],
+        backgroundColor: [
+          "#4a90e2",
+          "#20c997",
+          "#f5b700",
+          "#ff5252"
+        ],
+        borderRadius: 10,
+        barThickness: 18
+      }]
+    },
+    options: {
+  // 1. Reset layout padding so the title stays near "Insights"
+  layout: { padding: { top: 0 } }, 
+
+  plugins: {
+    title: {
+      display: true,
+      text: "Labor Hours by Department",
+      align: "start",
+      font: { size: 15, weight: "700" },
+      // 2. THIS creates the gap between title and the graph bars
+      padding: {
+        bottom: 25 
+      }
+    },
+        legend: { display: false },
+        datalabels: {
+          anchor: "end",
+          align: "top",
+          ...labelStyle
+        }
+      },
+
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: cleanGrid }
+      }
+    }
+  });
+
+
+  /* ========= 2️⃣ Punch Distribution — CLEAN DOUGHNUT ========= */
+
+/* ========= 2️⃣ Punch Distribution — LARGE & CLEAN ========= */
+new Chart(punchChart, {
+  type: "doughnut",
+  data: {
+    labels: ["Clocked In", "On Break", "Clocked Out"],
+    datasets: [{
+      data: [18, 3, 7],
+      backgroundColor: [
+        "#27c2a0", // Clean Green
+        "#f6b73c", // Clean Amber
+        "#ff6b6b"  // Clean Red
+      ],
+      borderWidth: 0,
+      hoverOffset: 4
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    // Set padding to 0 to allow the chart to fill the maximum possible space
+    layout: { 
+      padding: 0 
+    },
+    // Lower cutout (60-65%) makes the "pie" look fuller and more attractive
+    cutout: "62%", 
+    plugins: {
+      title: {
+        display: true,
+        text: "Punch Distribution",
+        align: "start",
+        font: { size: 15, weight: "700" },
+        color: "#1c2434",
+        padding: {
+          top: 10,
+          bottom: 15 // Gap between title and graph
+        }
+      },
+      legend: {
+        position: "bottom",
+        labels: {
+          usePointStyle: true,
+          pointStyle: "circle",
+          padding: 15, // Tightened padding to save space for the pie
+          font: { size: 15, weight: "700" },
+          color: "#555"
+        }
+      },
+      datalabels: {
+        color: "#fff",
+        font: { weight: "700", size: 13 }, // Larger numbers for better readability
+        formatter: (val) => val > 0 ? val : ""
+      }
+    }
+  }
+});
+
+
+  /* ========= 3️⃣ Overtime Trend ========= */
+
+  new Chart(otChart, {
+    type: "line",
+    data: {
+      labels: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+      datasets: [{
+        data: [2,3,4,5,4,6,7],
+        borderColor: "#8e5cf7",
+        backgroundColor: "rgba(142,92,247,.12)",
+        tension: .45,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: "#8e5cf7"
+      }]
+    },
+    options: {
+
+      layout: { padding: { top: 0 } },   // ⭐ GAP FIX
+
+      plugins: {
+        title: {
+          display: true,
+          text: "Overtime Trend (Last 7 Days)",
+          align: "start",
+          font: { size: 15, weight: "700" },
+      // This creates the specific gap between the Title and the Chart
+      padding: {
+        bottom: 25
+      }
+          
+        },
+        legend: { display: false },
+        datalabels: {
+          align: "top",
+          ...labelStyle
+        }
+      },
+
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: cleanGrid }
+      }
+    }
+  });
+
+
+  /* ========= 4️⃣ Punch Issues Breakdown ========= */
+
+  new Chart(issueChart, {
+    type: "bar",
+    data: {
+      labels: ["Missed","Late","Early Out","Short Break"],
+      datasets: [{
+        data: [5,3,2,4],
+        backgroundColor: [
+          "#ff5252",
+          "#ff8a00",
+          "#4a90e2",
+          "#20c997"
+        ],
+        borderRadius: 10,
+        barThickness: 18
+      }]
+    },
+    options: {
+
+      layout: { padding: { top: 0 } },   // ⭐ GAP FIX
+
+      indexAxis: "y",
+
+      plugins: {
+        title: {
+          display: true,
+          text: "Punch Issues Breakdown",
+          align: "start",
+          font: { size: 15, weight: "700" },
+      // This creates the specific gap between the Title and the Chart
+      padding: {
+        bottom: 25
+      }
+        },
+        legend: { display: false },
+        datalabels: {
+          anchor: "end",
+          align: "right",
+          ...labelStyle
+        }
+      },
+
+      scales: {
+        x: { beginAtZero: true, grid: cleanGrid },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+}
+
+/* ========= Weather Detail Screen ========= */
+function openWeatherDetails() {
+  const main = document.getElementById("main-content");
+
+  // Save dashboard state to return to it later
+  currentDashboardHTML = main.innerHTML;
+
+  // Update Header UI
+  document.getElementById("headerTitle").textContent = "Weather Forecast";
+  document.getElementById("backBtn").style.display = "inline";
+  document.getElementById("menuBtn").style.display = "none";
+
+  // Render the Forecast Page
+  main.innerHTML = `
+    <div class="page-title">Hourly Forecast</div>
+    <div class="emp-list">
+      ${renderForecastRow("Now", "18°C", "cloud", "Mostly Cloudy")}
+      ${renderForecastRow("4 PM", "17°C", "water_drop", "Light Rain Expected")}
+      ${renderForecastRow("5 PM", "16°C", "beach_access", "Heavy Rain (90%)")}
+      ${renderForecastRow("6 PM", "15°C", "thunderstorm", "Storm Warning")}
+      ${renderForecastRow("7 PM", "15°C", "cloudy", "Scattered Showers")}
+      ${renderForecastRow("8 PM", "14°C", "nightlight", "Clear Night")}
+    </div>
+    
+    <div class="section-card" style="margin-top:20px; background:#fff4e5; border:none; border-left: 5px solid #ffa000;">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <span class="material-icons-outlined" style="color:#ffa000; font-size: 28px;">lightbulb</span>
+        <div style="font-size:12px; color:#5d4037; line-height: 1.4;">
+          <b>Labor Insight:</b> Heavy rain starting at 5 PM usually reduces drive-thru volume by 25%. Consider checking labor vs. sales before the 6 PM shift change.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Helper to render rows consistently with your Employee list style
+function renderForecastRow(time, temp, icon, desc) {
+  return `
+    <div class="emp-card" style="
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        margin-bottom: 12px;
+        border-radius: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    ">
+      <div class="emp-avatar" style="
+          background: linear-gradient(135deg, #e0eaff, #ffffff);
+          box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+          color: #4a90e2;
+      ">
+        <span class="material-icons-outlined" style="font-size: 22px;">${icon}</span>
+      </div>
+      <div class="emp-info">
+        <div class="emp-name" style="font-weight: 700; color: #2c313c;">${time} <span style="margin: 0 8px; color: #cbd5e0; font-weight: 300;">|</span> ${temp}</div>
+        <div class="emp-sub" style="color: #718096; font-size: 11px; letter-spacing: 0.3px;">${desc}</div>
+      </div>
+      <div class="material-icons-outlined" style="color:#a0aec0; font-size: 18px;">chevron_right</div>
+    </div>
+  `;
+}
+
+function initDragAndDrop() {
+    const container = document.getElementById('sortable-dashboard');
+    const draggables = document.querySelectorAll('.draggable-container');
+
+    draggables.forEach(draggable => {
+        draggable.addEventListener('dragstart', () => {
+            draggable.classList.add('dragging');
+        });
+
+        draggable.addEventListener('dragend', () => {
+            draggable.classList.remove('dragging');
+            // ⭐ Re-initialize charts/sliders after reordering to prevent blank screens
+            initGraphs();
+            initHeroSlider();
+        });
+    });
+
+    container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(container, e.clientY);
+        const dragging = document.querySelector('.dragging');
+        if (afterElement == null) {
+            container.appendChild(dragging);
+        } else {
+            container.insertBefore(dragging, afterElement);
+        }
+    });
+}
+
+// Helper function to find the insertion point
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.draggable-container:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+/* Open Modern Edit Target Labor Screen */
+function openEditLabor() {
+    const main = document.getElementById("main-content");
+    currentDashboardHTML = main.innerHTML;
+
+    document.getElementById("headerTitle").textContent = "Edit Target Labor $";
+    document.getElementById("backBtn").style.display = "inline";
+    document.getElementById("menuBtn").style.display = "none";
+
+    main.innerHTML = `
+        <div style="padding: 10px 0;">
+            <p style="font-size: 13px; color: #777; margin-bottom: 20px;">Adjust your budget thresholds to keep labor costs under control.</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                ${renderTargetInput("Daily Target", "1800", "calendar_view_day", "#4a90e2")}
+                ${renderTargetInput("Weekly Target", "12600", "view_week", "#20c997")}
+                ${renderTargetInput("Pay Period Target", "25200", "payments", "#8e5cf7")}
+            </div>
+
+            <button onclick="saveLaborTargets()" style="width:100%; background: linear-gradient(135deg, #4a90e2, #357abd); color:white; border:none; padding:18px; border-radius:16px; font-weight:700; font-size: 15px; margin-top: 30px; box-shadow: 0 10px 20px rgba(74, 144, 226, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span class="material-icons-outlined">save</span> Save Budget Targets
+            </button>
+        </div>
+    `;
+}
+
+// Helper for attractive inputs
+function renderTargetInput(label, val, icon, color) {
+    return `
+        <div style="background: white; padding: 16px; border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); border: 1px solid #f0f0f0;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <div style="background: ${color}15; color: ${color}; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-icons-outlined" style="font-size: 18px;">${icon}</span>
+                </div>
+                <span style="font-size: 13px; font-weight: 700; color: #1c2434;">${label}</span>
+            </div>
+            <div style="position: relative; display: flex; align-items: center;">
+                <span style="position: absolute; left: 15px; color: #333; font-weight: 700;">$</span>
+                <input type="number" id="input-${label.split(' ')[0]}" value="${val}" style="width: 100%; padding: 12px 12px 12px 30px; border-radius: 12px; border: 1px solid #eef0f2; background: #f8fafc; font-size: 16px; font-weight: 700; color: #1c2434; outline: none; transition: border 0.2s;" onfocus="this.style.borderColor='#4a90e2'">
+            </div>
+        </div>
+    `;
+}
+
+// Global memory for targets (Default values)
+let laborTargets = { Daily: 1800, Weekly: 12600, "Pay Period": 25200 };
+let currentSpent = 1476; // Sample spent data
+
+function updateLaborView(period, btn) {
+    // 1. Update Selector UI
+    document.querySelectorAll('.labor-sel').forEach(b => {
+        b.style.background = "transparent";
+        b.style.color = "#666";
+        b.style.boxShadow = "none";
+    });
+    btn.style.background = "#fff";
+    btn.style.color = "#4a90e2";
+    btn.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+
+    // 2. Update Data Labels
+    document.getElementById('laborViewLabel').textContent = period + " Actual";
+    const limit = laborTargets[period];
+    document.getElementById('currentLimitDisplay').textContent = "$" + limit.toLocaleString();
+
+    // 3. Update Progress Bar & Percentage
+    // Note: In a real app, 'currentSpent' would also change based on period
+    const percent = Math.min(Math.round((currentSpent / limit) * 100), 100);
+    document.getElementById('percentDisplay').textContent = percent + "%";
+    document.getElementById('laborProgressBar').style.width = percent + "%";
+}
+
+function saveLaborTargets() {
+    laborTargets.Daily = document.getElementById('input-Daily').value;
+    laborTargets.Weekly = document.getElementById('input-Weekly').value;
+    laborTargets["Pay Period"] = document.getElementById('input-Pay').value;
+    
+    goBackDashboard(); // Returns and re-initializes
+}
+
+
+/* Open Approaching OT Detail Screen */
+function openApproachingOT() {
+  const main = document.getElementById("main-content");
+
+  // Save dashboard state to return later
+  currentDashboardHTML = main.innerHTML;
+
+  // Update Header UI
+  document.getElementById("headerTitle").textContent = "Approaching OT";
+  document.getElementById("backBtn").style.display = "inline";
+  document.getElementById("menuBtn").style.display = "none";
+
+  // Filter or use your OT data (using your existing workforceData.overtime as a base)
+  const otList = workforceData.overtime;
+
+  if (!otList.length) {
+    main.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No employees approaching OT</div>`;
+    return;
+  }
+
+  const cards = otList.map(emp => `
+    <div class="emp-card" style="margin-bottom: 12px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+      <div class="emp-avatar" style="background: #fff1f0; color: #ff5252;">${emp.init}</div>
+      <div class="emp-info">
+        <div class="emp-name">${emp.name}</div>
+        <div style="display: flex; gap: 10px; margin-top: 4px;">
+            <div style="font-size: 11px; color: #777;"><b style="color:#4a90e2;">Clock In:</b> 9:02 AM</div>
+            <div style="font-size: 11px; color: #777;"><b style="color:#ff5252;">Total Hrs:</b> ${emp.sub.split(' ')[1]}</div>
+        </div>
+      </div>
+      <div class="emp-badge badge-red" style="font-size: 10px;">Alert</div>
+    </div>
+  `).join("");
+
+  main.innerHTML = `
+    <div class="page-title">OT Watchlist</div>
+    <div class="emp-list">${cards}</div>
+    
+    <div class="section-card" style="margin-top:24px; background: rgba(255, 82, 82, 0.05); border: none; border-radius: 20px; padding: 15px;">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <span class="material-icons-outlined" style="color:#ff5252;">info</span>
+        <div style="font-size:12px; color:#c62828; line-height: 1.4;">
+          <b>Manager Action:</b> These employees are within 2 hours of weekly overtime. Consider swapping their remaining shifts to avoid premium pay.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
+function renderPunchRow(name, initial, color, hours, amount, badge) {
+    return `
+        <div class="punch-card">
+            <div class="punch-user-info">
+                <div class="punch-avatar" style="background: ${color}">
+                    ${badge ? `<div class="mini-badge">${badge}</div>` : ''}
+                    ${initial}
+                </div>
+                <div class="punch-details">
+                    <h5>${name}</h5>
+                    <div class="punch-time">
+                        <span class="material-icons-outlined" style="font-size:14px; color:${hours.includes('00.00') ? '#ff5252':'#4a90e2'}">schedule</span> 
+                        <span style="color:${hours.includes('00.00') ? '#ff5252':'#777'}">${hours}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="punch-amount">
+                <div class="punch-val">${amount}</div>
+                <span class="material-icons-outlined" style="color:#ccc; font-size:18px;">chevron_right</span>
+            </div>
+        </div>
+    `;
+}
+
+let punchHeroIndex = 0;
+
+function goPunchHeroPage(i) {
+    const slider = document.getElementById("punchHeroSlider");
+    const dots = document.querySelectorAll(".hero-dots .hero-dot");
+    punchHeroIndex = i;
+    slider.style.transform = `translateX(-${i * 100}%)`;
+    dots.forEach(d => d.classList.remove("active"));
+    dots[i].classList.add("active");
+}
+
+function initPunchHeroSlider() {
+    const slider = document.getElementById("punchHeroSlider");
+    let startX = 0;
+    slider.addEventListener("touchstart", e => startX = e.touches[0].clientX);
+    slider.addEventListener("touchend", e => {
+        const diff = startX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0 && punchHeroIndex < 1) punchHeroIndex++;
+            if (diff < 0 && punchHeroIndex > 0) punchHeroIndex--;
+            goPunchHeroPage(punchHeroIndex);
+        }
+    });
+}
+
+function toggleFilterModal(show) {
+    document.getElementById('modalOverlay').style.display = show ? 'block' : 'none';
+    document.getElementById('filterModal').style.display = show ? 'block' : 'none';
+}
+
+// Navigates to specific KPI data screens
+function openKpiDetail(title, type) {
+    const main = document.getElementById("main-content");
+    currentDashboardHTML = main.innerHTML; // Save current state for back navigation
+
+    document.getElementById("headerTitle").textContent = title;
+    document.getElementById("backBtn").style.display = "inline";
+    document.getElementById("menuBtn").style.display = "none";
+
+    if (type === 'table') {
+        main.innerHTML = renderComparisonTable();
+    } else {
+        main.innerHTML = renderEmployeeKpiList(title);
+    }
+}
+
+// Renders the Comparison Table UI
+// Navigates to the tabular data screen for any KPI tile
+function openKpiDetail(title) {
+    const main = document.getElementById("main-content");
+    // We don't save currentDashboardHTML here because we want 
+    // to keep the "Details" state separate from the "Table" state.
+
+    document.getElementById("headerTitle").textContent = title;
+    document.getElementById("backBtn").style.display = "inline";
+    document.getElementById("menuBtn").style.display = "none";
+
+    // ⭐ KEY CHANGE: Set the back button to return to the Details screen 
+    // instead of the Landing list.
+    const currentPeriodDate = document.querySelector(".payroll-detail-wrap .date-range-text")?.textContent || "";
+    const isFinalized = document.querySelector(".btn-proceed")?.textContent.includes("UNFINALIZE") || false;
+
+    document.getElementById("backBtn").onclick = () => openPayrollDetail(currentPeriodDate, isFinalized);
+
+    main.innerHTML = renderKpiTable(title);
+}
+
+// Redirects back to Punch Management landing
+function goBackToPunchMgmt() {
+    document.getElementById("headerTitle").textContent = "Zip Clock";
+    document.getElementById("backBtn").style.display = "none";
+    document.getElementById("menuBtn").style.display = "inline";
+    
+    // Reset backBtn to standard dashboard behavior
+    document.getElementById("backBtn").onclick = function() { goBackDashboard(); };
+
+    switchTab('punch-mgmt');
+}
+
+// Generates the Tabular Data UI with context-aware values
+function renderKpiTable(title) {
+    const isCurrency = title.includes('$');
+    const isWarning = title.includes('Warning');
+    const isHours = title.includes('Hrs') || title.includes('Overtime');
+
+    const formatValue = (base) => {
+        if (isCurrency) return `$ ${(base * 5.5).toFixed(2)}`;
+        if (isWarning) return `${Math.floor(base / 15)}`;
+        if (isHours) return `${base}:00`;
+        return base;
+    };
+
+    const tableData = [
+        { date: '02/16/2026', current: 126, last: 122, year: 131 },
+        { date: '02/17/2026', current: 133, last: 130, year: 142 },
+        { date: '02/18/2026', current: 129, last: 120, year: 140 },
+        { date: '02/19/2026', current: 100, last: 102, year: 108 },
+        { date: '02/20/2026', current: 119, last: 121, year: 135 },
+        { date: '02/21/2026', current: 115, last: 115, year: 125 },
+        { date: '02/22/2026', current: 121, last: 122, year: 141 },
+    ];
+
+    let rows = tableData.map(row => `
+        <tr>
+            <td>${row.date}</td>
+            <td class="col-highlight">${formatValue(row.current)}</td>
+            <td>${formatValue(row.last)}</td>
+            <td>${formatValue(row.year)}</td>
+        </tr>
+    `).join('');
+
+    return `
+        <div class="modern-table-card">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Current</th>
+                        <th>Last Wk</th>
+                        <th>Last Yr</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 15px; padding: 12px 18px; background: #e0f2fe; border-radius: 12px; display: flex; align-items: center; gap: 10px;">
+            <span class="material-icons-outlined" style="color: #0ea5e9; font-size: 20px;">insights</span>
+            <span style="color: #0369a1; font-size: 13px; font-weight: 500;">
+                Current trend is <b>4.2% higher</b> than last week.
+            </span>
+        </div>
+    `;
+}
+
+function renderMobileKpiCard(label, avg, days, isCurrency = false) {
+    const dayLabels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const prefix = isCurrency ? "$" : "";
+    
+    // Create the mini-grid for days with enhanced font sizes
+    const gridItems = days.map((val, i) => `
+        <div style="text-align: center; padding: 10px 4px; background: #f1f5f9; border-radius: 10px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 11px; color: #64748b; font-weight: 800; margin-bottom: 4px; letter-spacing: 0.5px;">${dayLabels[i]}</div>
+            <div style="font-size: 13px; color: #0f172a; font-weight: 700;">${prefix}${val}</div>
+        </div>
+    `).join('');
+
+    return `
+        <div class="section-card" style="margin-top: 0; padding: 20px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; background: #ffffff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="flex: 1;">
+                    <div style="font-size: 17px; font-weight: 800; color: #1e293b; line-height: 1.2;">${label}</div>
+                    <div style="font-size: 13px; color: #3b82f6; font-weight: 700; margin-top: 4px; background: #eff6ff; display: inline-block; padding: 2px 8px; border-radius: 6px;">
+                        Weekly Avg: ${prefix}${avg}
+                    </div>
+                </div>
+                <span class="material-icons-outlined" style="color: #94a3b8; font-size: 24px;">analytics</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                ${gridItems}
+            </div>
+        </div>
+    `;
+}
+
+function renderCollapsibleKpiCard(label, avg, days, id, isCurrency = false) {
+    // Vibrant colors for the left-border accents
+    const accentColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+    const accent = accentColors[id % accentColors.length];
+
+    const dayColors = [
+        { bg: '#f5f7ff', text: '#4f46e5' }, { bg: '#fffaf5', text: '#ea580c' },
+        { bg: '#f0fdf4', text: '#16a34a' }, { bg: '#faf5ff', text: '#9333ea' },
+        { bg: '#fff1f2', text: '#e11d48' }, { bg: '#f0fdfa', text: '#0d9488' },
+        { bg: '#fefce8', text: '#ca8a04' }
+    ];
+
+    const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+    const prefix = isCurrency ? "$" : "";
+    
+    const flexItems = days.map((val, i) => `
+        <div style="flex: 1; text-align: center; padding: 8px 2px; background: ${dayColors[i].bg}; border-radius: 10px; min-width: 0;">
+            <div style="font-size:12px; color: #94a3b8; font-weight: 800; margin-bottom: 2px;">${dayLabels[i]}</div>
+            <div style="font-size: 14px; color: ${dayColors[i].text}; font-weight: 700;">${prefix}${val}</div>
+        </div>
+    `).join('');
+
+    return `
+        <div class="section-card" style="
+            margin-bottom: 10px; 
+            padding: 0; 
+            border-radius: 16px; 
+            overflow: hidden; 
+            background: #ffffff; 
+            border-left: 6px solid ${accent};
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        ">
+            <div onclick="toggleKpi(${id})" style="padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                <div style="flex: 1;">
+                    <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 2px;">${label}</div>
+                    <div style="font-size: 16px; color: ${accent}; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                        <span class="material-icons-outlined" style="font-size: 13px;">analytics</span>
+                        Avg: ${prefix}${avg}
+                    </div>
+                </div>
+                <div style="background: #f8fafc; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 1px solid #f1f5f9;">
+                    <span class="material-icons-outlined" id="kpi-icon-${id}" style="color: #64748b; font-size: 20px; transition: transform 0.3s;">add</span>
+                </div>
+            </div>
+            
+            <div id="kpi-content-${id}" style="display: none; padding: 0 12px 14px 12px;">
+                <div style="display: flex; gap: 4px; padding: 10px; background: #fafbfc; border-radius: 12px; border: 1px solid #f1f5f9;">
+                    ${flexItems}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleKpi(id) {
+    const content = document.getElementById(`kpi-content-${id}`);
+    const icon = document.getElementById(`kpi-icon-${id}`);
+    const isHidden = content.style.display === "none";
+    
+    content.style.display = isHidden ? "block" : "none";
+    icon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+}
+
+// Navigates to the main KPI Dashboard
+function openKpiMainScreen() {
+    const main = document.getElementById("main-content");
+    currentDashboardHTML = main.innerHTML; // Store Punch Mgmt for return
+
+    document.getElementById("headerTitle").textContent = "KPIs";
+    document.getElementById("backBtn").style.display = "inline";
+    document.getElementById("menuBtn").style.display = "none";
+
+    // Set specific back arrow behavior for KPI screen
+    document.getElementById("backBtn").onclick = function() { goBackToPunchMgmt(); };
+
+    main.innerHTML = `
+        <div class="kpi-container" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px;">
+            <div style="padding: 0 5px; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 22px; font-weight: 800; color: #1c2434; letter-spacing: -0.5px;">Key Performance Indicators</h3>
+                <p style="margin: 4px 0 0; font-size: 14px; color: #1c6ee0; font-weight: 500;">June 09 - June 15, 2025</p>
+            </div>
+
+            ${renderCollapsibleKpiCard("Transaction Per Punched Hours", 7.89, [8.53, 7.80, 7.88, 7.87, 7.79, 7.74, 7.56], 1)}
+            ${renderCollapsibleKpiCard("Transaction Per Crew Hours", 7.89, [8.53, 7.80, 7.88, 7.87, 7.79, 7.74, 7.56], 2)}
+            ${renderCollapsibleKpiCard("Transaction Per Manager Hours", 158.07, [118.22, 111.67, 121.33, 0.00, 121.89, 105.56, 0.00], 3)}
+            ${renderCollapsibleKpiCard("Sales Per Scheduled Hours", 58.47, [59.88, 52.71, 61.27, 59.38, 58.00, 57.74, 60.80], 4, true)}
+            ${renderCollapsibleKpiCard("Sales Per Crew Hours", 63.98, [66.05, 59.72, 63.43, 62.81, 63.27, 66.31, 66.98], 5, true)}
+            ${renderCollapsibleKpiCard("Sales Per Manager Hours", "1,282.42", [914.89, 855.04, 976.98, 0.00, 989.30, 904.63, 0.00], 6, true)}
+        </div>
+    `;
+}
+
+
+function renderKPI(title, mainVal, leftVal, rightVal, leftLabel, rightLabel, colorTheme) {
+    const textColor = colorTheme === 'red' ? '#ff5252' : '#4a90e2';
+    const bgColor = colorTheme === 'red' ? '#fff5f5' : '#f0f7ff';
+    
+    return `
+        <div class="kpi-display-card" style="
+            display: flex; 
+            align-items: center; 
+            border-radius: 16px; 
+            padding: 18px; 
+            margin-bottom: 12px; 
+            background: ${bgColor};
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.05);
+        ">
+            <div style="flex: 1.2; border-right: 2px solid rgba(0,0,0,0.05); padding-right: 10px;">
+                <div style="font-size: 26px; font-weight: 900; color: ${textColor}; letter-spacing: -1px;">${mainVal}</div>
+                <div style="font-size: 12px; color: #555; font-weight: 600; text-transform: uppercase;">${title}</div>
+            </div>
+            <div style="flex: 1; text-align: center; border-right: 2px solid rgba(0,0,0,0.05);">
+                <div style="font-size: 17px; font-weight: 800; color: #1c2434;">${leftVal}</div>
+                <div style="font-size: 11px; color: #777; font-weight: 500;">${leftLabel}</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 17px; font-weight: 800; color: #1c2434;">${rightVal}</div>
+                <div style="font-size: 11px; color: #777; font-weight: 500;">${rightLabel}</div>
+            </div>
+        </div>
+    `;
+}
+
+
+let analyticsIndices = { daily: 0, weekly: 0 };
+
+function goAnalyticsPage(sliderId, index) {
+    const slider = document.getElementById(sliderId + "Slider");
+    const dots = slider.closest('.section-card').querySelectorAll(".graph-dot");
+    
+    analyticsIndices[sliderId] = index;
+    slider.style.transform = `translateX(-${index * 100}%)`;
+    
+    dots.forEach(d => d.classList.remove("active"));
+    dots[index].classList.add("active");
+}
+
+function initAnalyticsGraphs() {
+    // Shared configurations for high visibility
+    const fontSettings = { weight: '700', size: 11, color: '#1c2434' };
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+            legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } },
+            datalabels: { anchor: 'end', align: 'top', font: fontSettings }
+        },
+        scales: { 
+            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, 
+            x: { grid: { display: false } } 
+        }
+    };
+
+    // --- DAILY PERFORMANCE ---
+
+    // 1. Daily: Actual vs Needed (Soft Gradient Area)
+    new Chart(document.getElementById('dailyGraph1'), {
+        type: 'line',
+        data: {
+            labels: ['9AM','10AM','11AM','12PM','1PM','2PM','3PM'],
+            datasets: [
+                { label: 'Actual', data: [76, 93, 111, 129, 144, 160, 175], borderColor: '#ff6b6b', fill: true, backgroundColor: 'rgba(255, 107, 107, 0.15)', tension: 0.3 },
+                { label: 'Needed', data: [113, 134, 152, 169, 186, 205, 220], borderColor: '#845ef7', fill: true, backgroundColor: 'rgba(132, 94, 247, 0.1)', tension: 0.3 }
+            ]
+        },
+        options: commonOptions
+    });
+
+    // 2. Daily: Actual vs Schedule (High Contrast Lines)
+    new Chart(document.getElementById('dailyGraph2'), {
+        type: 'line',
+        data: {
+            labels: ['9AM','10AM','11AM','12PM','1PM','2PM','3PM'],
+            datasets: [
+                { label: 'Actual', data: [76, 93, 111, 129, 144, 160, 175], borderColor: '#4dadf7', borderWidth: 3 },
+                { label: 'Schedule', data: [163, 194, 222, 249, 276, 300, 320], borderColor: '#ff922b', borderDash: [5, 5] }
+            ]
+        },
+        options: commonOptions
+    });
+
+    // 3. Daily: Potential Financial Loss (Light & Clear Doughnut)
+    new Chart(document.getElementById('dailyGraph3'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Early ClockIn', 'Late ClockIn', 'OT Loss', 'Break Violation'],
+            datasets: [{ 
+                data: [45, 196, 120, 68], 
+                backgroundColor: ['#a5d8ff', '#b2f2bb', '#ffec99', '#ffc9c9'], // Lighter colors for text visibility
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            cutout: '60%',
+            plugins: { 
+                legend: { position: 'bottom' },
+                datalabels: { display: true, color: '#444', font: { weight: 'bold' } }
+            } 
+        }
+    });
+
+    // 4. Daily: Potential Time Loss (Vibrant Multi-Color Bar)
+    new Chart(document.getElementById('dailyGraph4'), {
+        type: 'bar',
+        data: {
+            labels: ['Early', 'Late', 'OT', 'Break'],
+            datasets: [{ 
+                label: 'Dollar Loss ($)', 
+                data: [320, 1237, 450, 420], 
+                backgroundColor: ['#4c6ef5', '#fab005', '#fa5252', '#40c057'],
+                borderRadius: 8
+            }]
+        },
+        options: commonOptions
+    });
+
+    // --- WEEK TO DATE PERFORMANCE ---
+
+    // 1. Weekly: Actual vs Needed (Mint & Teal Mix)
+    new Chart(document.getElementById('weeklyGraph1'), {
+        type: 'bar',
+        data: {
+            labels: ['Mon','Tue','Wed','Thu','Fri','Sat'],
+            datasets: [
+                { label: 'Actual', data: [151, 165, 140, 155, 170, 185], backgroundColor: '#63e6be' },
+                { label: 'Needed', data: [222, 223, 223, 235, 223, 223], backgroundColor: '#0b7285' }
+            ]
+        },
+        options: { ...commonOptions, borderRadius: 5 }
+    });
+
+    // 2. Weekly: Actual vs Schedule (Deep Plum & Gold)
+    new Chart(document.getElementById('weeklyGraph2'), {
+        type: 'bar',
+        data: {
+            labels: ['Mon','Tue','Wed','Thu','Fri','Sat'],
+            datasets: [
+                { label: 'Actual', data: [151, 165, 140, 155, 170, 185], backgroundColor: '#e599f7' },
+                { label: 'Schedule', data: [342, 343, 343, 355, 343, 343], backgroundColor: '#6741d9' }
+            ]
+        },
+        options: { ...commonOptions, borderRadius: 5 }
+    });
+
+    // 3. Weekly: Potential Financial Loss (Stacked Ocean Theme)
+    new Chart(document.getElementById('weeklyGraph3'), {
+        type: 'bar',
+        data: {
+            labels: ['Day 18', 'Day 19', 'Day 20'],
+            datasets: [
+                { label: 'Early', data: [85, 113, 90], backgroundColor: '#15aabf' },
+                { label: 'Late', data: [140, 119, 196], backgroundColor: '#1c7ed6' },
+                { label: 'Break', data: [55, 40, 68], backgroundColor: '#74c0fc' }
+            ]
+        },
+        options: { 
+            ...commonOptions, 
+            scales: { x: { stacked: true }, y: { stacked: true } } 
+        }
+    });
+
+    // 4. Weekly: Potential Time Loss (Sunrise Theme)
+    new Chart(document.getElementById('weeklyGraph4'), {
+        type: 'bar',
+        data: {
+            labels: ['Early', 'Late', 'OT', 'Break'],
+            datasets: [{ 
+                label: 'Dollar Loss ($)', 
+                data: [850, 2437, 1290, 940], 
+                backgroundColor: ['#ffc078', '#ffa94d', '#ff922b', '#fd7e14'],
+                borderRadius: 8
+            }]
+        },
+        options: commonOptions
+    });
+}
+
+function initAnalyticsSwipe() {
+    ['daily', 'weekly'].forEach(id => {
+        const slider = document.getElementById(id + "Slider");
+        let startX = 0;
+        slider.addEventListener("touchstart", e => startX = e.touches[0].clientX);
+        slider.addEventListener("touchend", e => {
+            const diff = startX - e.changedTouches[0].clientX;
+            const max = id === 'daily' ? 2 : 1;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0 && analyticsIndices[id] < max) analyticsIndices[id]++;
+                if (diff < 0 && analyticsIndices[id] > 0) analyticsIndices[id]--;
+                goAnalyticsPage(id, analyticsIndices[id]);
+            }
+        });
+    });
+}
+
+// --- Payroll Landing Page ---
+function renderPayrollLanding() {
+    const main = document.getElementById('main-content');
+    document.getElementById("headerTitle").textContent = "Payroll Management";
+    
+    main.innerHTML = `
+        <div class="payroll-container" style="padding: 10px;">
+            <div class="calendar-bar" style="margin-bottom: 20px;">
+                <span class="material-icons-outlined">chevron_left</span>
+                <span class="material-icons-outlined">calendar_today</span>
+                <div class="date-range-text">Aug 27 '25 - Feb 27 '26</div>
+                <span class="material-icons-outlined">arrow_drop_down</span>
+                <span class="material-icons-outlined">chevron_right</span>
+            </div>
+
+            <div class="payroll-period-list">
+                ${renderPayrollPeriodCard("Feb 23 '26 - Mar 01 '26", "234:00", "72", "1088.75", true)}
+                ${renderPayrollPeriodCard("Feb 16 '26 - Feb 22 '26", "345:00", "12", "1256.00", false)}
+                ${renderPayrollPeriodCard("Feb 09 '26 - Feb 15 '26", "452:25", "102", "1562.50", false)}
+            </div>
+        </div>
+    `;
+}
+
+function renderPayrollPeriodCard(date, labor, extra, total, isFinalized) {
+    const statusClass = isFinalized ? 'period-status-finalized' : 'period-status-unfinalized';
+    const pillClass = isFinalized ? 'final' : 'unfinal';
+    const statusText = isFinalized ? 'Finalized' : 'Unfinalized';
+
+    // We escape the single quotes in the date string so they don't break the onclick attribute
+    const safeDate = date.replace(/'/g, "\\'");
+
+    return `
+        <div class="period-card-modern ${statusClass}" 
+             onclick="openPayrollDetail('${safeDate}', ${isFinalized})">
+            <div class="period-header">
+                <div class="period-date">${date}</div>
+                <div class="status-pill ${pillClass}">${statusText}</div>
+            </div>
+            
+            <div class="period-stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Labor Hours</span>
+                    <span class="stat-value">${labor}</span>
+                </div>
+                <div class="stat-item" style="text-align: right;">
+                    <span class="stat-label">Extra Pay</span>
+                    <span class="stat-value">$ ${extra}</span>
+                </div>
+            </div>
+
+            <div class="total-pay-bar">
+                <span class="total-label">Total Pay</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span class="total-amount">$ ${total}</span>
+                    <span class="material-icons-outlined" style="font-size: 16px; color: #cbd5e1;">chevron_right</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+// --- Payroll Detail Screen ---
+function openPayrollDetail(date, isFinalized) {
+    const main = document.getElementById('main-content');
+    
+    document.getElementById("headerTitle").textContent = "Payroll Details";
+    document.getElementById("backBtn").style.display = "inline";
+    document.getElementById("menuBtn").style.display = "none";
+    document.getElementById("backBtn").onclick = () => renderPayrollLanding();
+
+    main.innerHTML = `
+        <div class="payroll-detail-wrap" style="padding: 10px;">
+<!-- Calendar + Graph (Payroll Details) -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+
+    <!-- CALENDAR PILL -->
+    <div class="calendar-bar" style="display:flex; align-items:center; gap:10px;">
+        
+        <span class="material-icons-outlined">chevron_left</span>
+
+        <span class="material-icons-outlined">calendar_today</span>
+
+        <div class="date-range-text">${date}</div>
+
+        <span class="material-icons-outlined">arrow_drop_down</span>
+
+        <span class="material-icons-outlined">chevron_right</span>
+
+    </div>
+
+    <!-- SAME ICON — NOW GREEN -->
+    <span class="material-icons-outlined"
+          style="color:#20c997; font-size:24px; cursor:pointer;"
+          onclick="renderPayrollAnalytics(&quot;${date}&quot;, ${isFinalized})">
+        bar_chart
+    </span>
+
+</div>
+
+            <div class="hero-card">
+                <div class="hero-slider-wrap">
+                    <div class="hero-slider" id="payrollKpiSlider">
+                        <div class="hero-page">
+                            ${renderPayrollTile("Total Hours", "42.5", "stat-blue")}
+                            ${renderPayrollTile("OT Hours", "2.1", "stat-red")}
+                            ${renderPayrollTile("Sales $", "$5,240", "stat-green")}
+                        </div>
+                        <div class="hero-page">
+                            ${renderPayrollTile("Pay Period Labor %", "18.2%", "stat-purple")}
+                            ${renderPayrollTile("Time Loss $", "$120", "stat-yellow")}
+                            ${renderPayrollTile("Extra Pay", "$0", "stat-blue")}
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-dots">
+                    <div class="hero-dot active" onclick="goPayrollPage(0)"></div>
+                    <div class="hero-dot" onclick="goPayrollPage(1)"></div>
+                </div>
+            </div>
+
+            <div class="section-card" style="margin-top:20px; padding:0; overflow:hidden;">
+                <div onclick="togglePayrollTotal()" style="padding:15px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:#fcfcfc;">
+                    <span style="font-weight:800; color:#4a90e2;">Total Pay</span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-weight:800; color:#1c2434;">$16.75</span>
+                        <span class="material-icons-outlined" id="payArrow">expand_more</span>
+                    </div>
+                </div>
+                <div id="payDetails" style="display:none; padding:15px; border-top:1px solid #eee; background:white;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;"><span>Total Reg Pay:</span><b>$16.75</b></div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;"><span>Total OT Pay:</span><b>$0.00</b></div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;"><span>Total Extra Pay:</span><b>$0.00</b></div>
+                </div>
+            </div>
+
+            <div class="payroll-checklist" style="margin-top:20px;">
+                ${renderChecklistItem("Open Punches", "verified", true)}
+                ${renderChecklistItem("Mismatch Punches", "fingerprint", true)}
+                ${renderChecklistItem("Unauthorized Punches", "block", true)}
+                ${renderChecklistItem("Extra Pay", "payments", false, "0")}
+            </div>
+
+            <div style="margin-top:30px;">
+                <button class="btn-proceed" style="background:${isFinalized ? '#ff5252' : '#20c997'}; width:100%; border-radius:25px; padding:15px; border:none; color:white; font-weight:700;">
+                    ${isFinalized ? 'UNFINALIZE' : 'FINALIZE'}
+                </button>
+            </div>
+        </div>
+    `;
+    initPayrollSlider();
+}
+
+function renderPayrollTile(label, val, colorClass) {
+    return `
+        <div class="hero-stat ${colorClass}" onclick="openKpiDetail('${label}')" style="cursor:pointer">
+            <div class="hero-num">${val}</div>
+            <div class="hero-label">${label}</div>
+        </div>
+    `;
+}
+
+function renderChecklistItem(label, icon, isDone, count) {
+    return `
+        <div style="display:flex; align-items:center; gap:15px; padding:15px; background:white; border-radius:12px; margin-bottom:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+            <div style="color:#777;"><span class="material-icons-outlined">${icon}</span></div>
+            <div style="flex:1; font-weight:600; font-size:14px; color:#555;">${label}</div>
+            ${isDone ? 
+                '<div style="background:#e8f5e9; color:#2e7d32; border-radius:50%; padding:2px;"><span class="material-icons-outlined" style="font-size:18px;">done</span></div>' : 
+                `<div style="font-weight:800; color:#777; background:#f0f2f5; padding:2px 10px; border-radius:10px;">${count}</div>`
+            }
+            <span class="material-icons-outlined" style="color:#ccc;">chevron_right</span>
+        </div>
+    `;
+}
+
+function togglePayrollTotal() {
+    const detail = document.getElementById('payDetails');
+    const arrow = document.getElementById('payArrow');
+    const isHidden = detail.style.display === 'none';
+    detail.style.display = isHidden ? 'block' : 'none';
+    arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+function initPayrollSlider() {
+    const slider = document.getElementById("payrollKpiSlider");
+    if (!slider) return;
+
+    let startX = 0; // Fixed: Defined in correct scope
+    let index = 0;
+
+    slider.addEventListener("touchstart", e => { 
+        startX = e.touches[0].clientX; 
+    });
+
+    slider.addEventListener("touchend", e => {
+        const diff = startX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) {
+            index = diff > 0 ? 1 : 0;
+            slider.style.transform = "translateX(-" + (index * 100) + "%)";
+            const dots = slider.closest('.hero-card').querySelectorAll('.hero-dot');
+            dots.forEach((d, i) => d.classList.toggle('active', i === index));
+        }
+    });
+}
+
+let payrollSliderIndex = 0;
+
+function goPayrollPage(i) {
+    const slider = document.getElementById("payrollKpiSlider");
+    const dots = slider.closest('.hero-card').querySelectorAll(".hero-dot");
+
+    payrollSliderIndex = i;
+    slider.style.transform = `translateX(-${i * 100}%)`;
+
+    dots.forEach(d => d.classList.remove("active"));
+    dots[i].classList.add("active");
+}
+
+function initPayrollSlider() {
+    const slider = document.getElementById("payrollKpiSlider");
+    if (!slider) return;
+
+    let startX = 0;
+    payrollSliderIndex = 0; // Reset index on load
+
+    slider.addEventListener("touchstart", e => { 
+        startX = e.touches[0].clientX; 
+    });
+
+    slider.addEventListener("touchend", e => {
+        const diff = startX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0 && payrollSliderIndex < 1) payrollSliderIndex++;
+            else if (diff < 0 && payrollSliderIndex > 0) payrollSliderIndex--;
+            
+            goPayrollPage(payrollSliderIndex);
+        }
+    });
+}
+
+function renderPayrollAnalytics(date, isFinalized) {
+    const main = document.getElementById('main-content');
+    document.getElementById("headerTitle").textContent = "Timekeeping Data";
+    document.getElementById("backBtn").onclick = () => openPayrollDetail(date, isFinalized);
+
+    main.innerHTML = `
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 20px; background: #fdfdfd;">
+            
+            <div class="chart-card-modern">
+                <div class="chart-header-compact">
+                    <h4 class="chart-title-main">Current Week Data</h4>
+                    <select id="currentWeekSelect" class="modern-select" onchange="updateCurrentWeekChart()">
+                        <option value="laborPct">Actual Labor %</option>
+                        <option value="ideal">Actual vs Ideal Hours</option>
+                        <option value="projected">Actual vs Projected Hours</option>
+                        <option value="scheduled">Actual vs Scheduled Hours</option>
+                    </select>
+                </div>
+                <div style="height:260px;"><canvas id="currentWeekChart"></canvas></div>
+            </div>
+
+            <div class="chart-card-modern">
+                <div class="chart-header-compact">
+                    <h4 class="chart-title-main">Timekeeping Trend</h4>
+                    <select id="trendSelect" class="modern-select" onchange="updateTrendChart()">
+                        <option value="trendLabor">Actual Labor %</option>
+                        <option value="trendSched">Actual vs Scheduled Hours</option>
+                        <option value="otdt">OT/DT Hours</option>
+                        <option value="breaks">Break Warnings</option>
+                    </select>
+                </div>
+                <div style="height:260px;"><canvas id="trendChart"></canvas></div>
+            </div>
+        </div>
+    `;
+    initAnalyticsCharts();
+}
+
+
+let weekChart, trendChart;
+
+function initAnalyticsCharts() {
+    updateCurrentWeekChart();
+    updateTrendChart();
+}
+
+function updateCurrentWeekChart() {
+    const type = document.getElementById('currentWeekSelect').value;
+    const canvas = document.getElementById('currentWeekChart');
+    const ctx = canvas.getContext('2d');
+    
+    if (weekChart) weekChart.destroy();
+
+    const labels = ['02/17', '02/18', '02/19', '02/20', '02/21', '02/22', '02/23'];
+    const actualHrs = [112, 115, 110, 125, 130, 128, 105]; // Constant baseline for comparison
+    
+    let chartData = {
+        labels: labels,
+        datasets: []
+    };
+
+    // Shared styling for the "Actual" bars
+    const actualDataset = {
+        label: 'Actual Hrs',
+        data: actualHrs,
+        backgroundColor: '#ff8a00',
+        borderRadius: 6,
+        barThickness: 12
+    };
+
+    if (type === 'laborPct') {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, 'rgba(255, 138, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(255, 138, 0, 0)');
+
+        chartData.datasets = [{
+            label: 'Labor %',
+            data: [30, 26, 25, 23, 23, 27, 23],
+            borderColor: '#ff8a00',
+            backgroundColor: gradient,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#ff8a00',
+            pointBorderWidth: 2,
+            pointRadius: 4
+        }];
+    } 
+    else if (type === 'ideal') {
+        chartData.datasets = [
+            actualDataset,
+            {
+                label: 'Ideal Hrs',
+                // Ideal is usually the "Leanest" target (lower than actual)
+                data: [100, 105, 102, 115, 120, 118, 95],
+                backgroundColor: '#20c997', // Green for "Ideal"
+                borderRadius: 6,
+                barThickness: 12
+            }
+        ];
+    } 
+    else if (type === 'projected') {
+        chartData.datasets = [
+            actualDataset,
+            {
+                label: 'Projected Hrs',
+                // Projected is the AI forecast (should vary around actual)
+                data: [115, 110, 118, 122, 135, 130, 110],
+                backgroundColor: '#4a90e2', // Blue for "Projected"
+                borderRadius: 6,
+                barThickness: 12
+            }
+        ];
+    } 
+    else if (type === 'scheduled') {
+        chartData.datasets = [
+            actualDataset,
+            {
+                label: 'Scheduled Hrs',
+                // Scheduled is fixed (often higher than actual due to call-outs)
+                data: [120, 120, 120, 140, 140, 140, 120],
+                backgroundColor: '#cbd5e1', // Grey for "Fixed Schedule"
+                borderRadius: 6,
+                barThickness: 12
+            }
+        ];
+    }
+
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: '600', size: 11 } } },
+            datalabels: {
+                display: true,
+                align: 'top',
+                font: { weight: '700', size: 10 },
+                color: '#475569',
+                formatter: (value) => type === 'laborPct' ? value + '%' : value
+            }
+        },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f1f5f9', drawBorder: false }, ticks: { font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } }
+        }
+    };
+
+    weekChart = new Chart(ctx, {
+        type: type === 'laborPct' ? 'line' : 'bar',
+        data: chartData,
+        options: commonOptions
+    });
+}
+function updateTrendChart() {
+    const type = document.getElementById('trendSelect').value;
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+
+    const labels = ['02/17', '02/18', '02/19', '02/20', '02/21', '02/22', '02/23'];
+    
+    let datasets = [];
+    if (type === 'otdt') {
+        datasets = [
+            { label: 'OT Hours', data: [0.5, 0.2, 0.8, 1.2, 0, 15.2, 0], backgroundColor: '#ef4444', borderRadius: 4 },
+            { label: 'DT Hours', data: [0, 0, 0, 0, 0, 4.5, 0], backgroundColor: '#1e293b', borderRadius: 4 }
+        ];
+    } else if (type === 'breaks') {
+        datasets = [
+            { label: 'This Wk', data: [6, 3, 4, 7, 3, 5, 3], backgroundColor: '#ff8a00', borderRadius: 20 },
+            { label: 'Last Wk', data: [5, 2, 2, 7, 6, 4, 3], backgroundColor: '#cbd5e1', borderRadius: 20 }
+        ];
+    } else if (type === 'trendSched') {
+        datasets = [
+            { label: 'Actual', data: [112, 112, 115, 114, 118, 126, 103], backgroundColor: '#ff8a00', borderRadius: 5 },
+            { label: 'Sched', data: [128, 126, 133, 116, 131, 135, 104], backgroundColor: '#1e293b', borderRadius: 5 }
+        ];
+    } else {
+        datasets = [
+            { label: 'This Wk', data: [29, 26, 25, 23, 23, 27, 23], backgroundColor: '#ff8a00', borderRadius: 5 },
+            { label: 'Last Wk', data: [28, 27, 26, 24, 25, 26, 25], backgroundColor: '#cbd5e1', borderRadius: 5 }
+        ];
+    }
+
+    trendChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: '600' } } },
+                datalabels: { display: true, anchor: 'end', align: 'top', font: { weight: '700', size: 9 } }
+            },
+            scales: {
+                y: { stacked: type === 'otdt', grid: { color: '#f1f5f9' }, border: { display: false } },
+                x: { stacked: type === 'otdt', grid: { display: false } }
+            }
+        }
+    });
+}
+
+    </script>
+</body>
+</html>
