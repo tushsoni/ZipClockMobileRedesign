@@ -854,17 +854,16 @@
         gap: 12px;
       }
 
-      .emp-card {
+.emp-card {
     background: white;
     border-radius: 16px;
     padding: 12px;
     display: flex;
-    align-items: center;
-    gap: 12px; /* Correct spacing between avatar and text */
+    align-items: center; /* This vertically centers the avatar, info, and arrow/badge */
+    gap: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     margin-bottom: 12px;
-    overflow: hidden; /* Prevents image from spilling out */
-    height: 80px; /* Fixed height to keep list consistent */
+    min-height: 80px; /* Ensures a consistent height across the list */
 }
 
       .emp-card:active {
@@ -889,11 +888,11 @@
 }
 
 .emp-info {
-    flex: 1; /* Takes up remaining space */
+    flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    min-width: 0; /* Prevents text from pushing card width */
+    justify-content: center; /* This centers the name and sub-text vertically within the info block */
+    min-width: 0; 
 }
 
       .emp-name {
@@ -4037,31 +4036,24 @@ const workforceData = {
       }
 
       // Helper to render rows consistently with your Employee list style
-      function renderForecastRow(time, temp, icon, desc) {
-        return `
-    <div class="emp-card" style="
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        margin-bottom: 12px;
-        border-radius: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-    ">
-      <div class="emp-avatar" style="
-          background: linear-gradient(135deg, #e0eaff, #ffffff);
-          box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
-          color: #4a90e2;
-      ">
-        <span class="material-icons-outlined" style="font-size: 22px;">${icon}</span>
+function renderForecastRow(time, temp, icon, desc) {
+  return `
+    <div class="emp-card">
+      <div class="emp-avatar" style="display: flex; align-items: center; justify-content: center;">
+        <span class="material-icons-outlined">${icon}</span>
       </div>
       <div class="emp-info">
-        <div class="emp-name" style="font-weight: 700; color: #2c313c;">${time} <span style="margin: 0 8px; color: #cbd5e0; font-weight: 300;">|</span> ${temp}</div>
-        <div class="emp-sub" style="color: #718096; font-size: 11px; letter-spacing: 0.3px;">${desc}</div>
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+            <span style="font-weight: 700; font-size: 15px;">${time}</span>
+            <span style="color: #cbd5e0;">|</span>
+            <span style="font-weight: 700; font-size: 15px;">${temp}</span>
+        </div>
+        <div class="emp-sub">${desc}</div>
       </div>
-      <div class="material-icons-outlined" style="color:#a0aec0; font-size: 18px;">chevron_right</div>
+      <span class="material-icons-outlined" style="color:#ccc;">chevron_right</span>
     </div>
   `;
-      }
+}
 
       function initDragAndDrop() {
         const container = document.getElementById("sortable-dashboard");
@@ -4201,57 +4193,55 @@ const workforceData = {
       }
 
       /* Open Approaching OT Detail Screen */
-      function openApproachingOT() {
-        const main = document.getElementById("main-content");
+function openApproachingOT() {
+  const main = document.getElementById("main-content");
+  currentDashboardHTML = main.innerHTML; // Store current view
 
-        // Save dashboard state to return later
-        currentDashboardHTML = main.innerHTML;
+  document.getElementById("headerTitle").textContent = "Approaching OT";
+  document.getElementById("backBtn").style.display = "inline";
+  document.getElementById("menuBtn").style.display = "none";
 
-        // Update Header UI
-        document.getElementById("headerTitle").textContent = "Approaching OT";
-        document.getElementById("backBtn").style.display = "inline";
-        document.getElementById("menuBtn").style.display = "none";
+  const otList = workforceData.overtime;
 
-        // Filter or use your OT data (using your existing workforceData.overtime as a base)
-        const otList = workforceData.overtime;
+  if (!otList.length) {
+    main.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No employees approaching OT</div>`;
+    return;
+  }
 
-        if (!otList.length) {
-          main.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No employees approaching OT</div>`;
-          return;
-        }
-
-        const cards = otList
-          .map(
-            (emp) => `
-    <div class="emp-card" style="margin-bottom: 12px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
-      <div class="emp-avatar" style="background: #fff1f0; color: #ff5252;">${emp.init}</div>
-      <div class="emp-info">
-        <div class="emp-name">${emp.name}</div>
-        <div style="display: flex; gap: 10px; margin-top: 4px;">
-            <div style="font-size: 11px; color: #777;"><b style="color:#4a90e2;">Clock In:</b> 9:02 AM</div>
-            <div style="font-size: 11px; color: #777;"><b style="color:#ff5252;">Total Hrs:</b> ${emp.sub.split(" ")[1]}</div>
+  const cards = otList.map(emp => `
+    <div class="emp-card" style="display: flex; align-items: center; min-height: 90px; padding: 12px 20px; margin-bottom: 12px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+      <div class="emp-avatar" style="background: #fff1f0; color: #ff5252; flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 55px; height: 55px; border-radius: 50%; font-weight: bold;">
+        ${emp.init}
+      </div>
+      
+      <div class="emp-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center; margin-left: 15px;">
+        <div style="font-size: 16px; font-weight: 700; color: #1c2434; margin-bottom: 2px;">${emp.name}</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 12px; color: #777;"><b style="color:#4a90e2;">Clock In:</b> 9:02 AM</div>
+            <span style="color: #cbd5e0;">|</span>
+            <div style="font-size: 12px; color: #777;"><b style="color:#ff5252;">Total Hrs:</b> ${emp.sub.split(" ")[1]}</div>
         </div>
       </div>
-      <div class="emp-badge badge-red" style="font-size: 10px;">Alert</div>
-    </div>
-  `,
-          )
-          .join("");
 
-        main.innerHTML = `
-    <div class="page-title">OT Watchlist</div>
+      <div class="emp-badge badge-red" style="font-size: 11px; padding: 4px 12px; border-radius: 12px; flex-shrink: 0;">
+        Alert
+      </div>
+    </div>
+  `).join("");
+
+  main.innerHTML = `
+    <div class="page-title" style="margin-bottom: 15px; font-weight: 800;">OT Watchlist</div>
     <div class="emp-list">${cards}</div>
     
-    <div class="section-card" style="margin-top:24px; background: rgba(255, 82, 82, 0.05); border: none; border-radius: 20px; padding: 15px;">
-      <div style="display:flex; gap:12px; align-items:center;">
-        <span class="material-icons-outlined" style="color:#ff5252;">info</span>
-        <div style="font-size:12px; color:#c62828; line-height: 1.4;">
-          <b>Manager Action:</b> These employees are within 2 hours of weekly overtime. Consider swapping their remaining shifts to avoid premium pay.
+    <div class="section-card" style="margin-top:24px; background: rgba(255, 82, 82, 0.05); border: none; border-radius: 20px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+        <span class="material-icons-outlined" style="color:#ff5252; font-size: 24px;">info</span>
+        <div style="font-size:12px; color:#c62828; line-height: 1.5;">
+          <b style="display: block; margin-bottom: 2px;">Manager Action:</b> 
+          These employees are within 2 hours of weekly overtime. Consider swapping shifts to avoid premium pay.
         </div>
-      </div>
     </div>
   `;
-      }
+}
 
       function renderPunchRow(name, initial, color, hours, amount, badge) {
         return `
