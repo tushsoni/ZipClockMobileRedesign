@@ -2890,23 +2890,28 @@
         <div class="hero-label">Overtime</div>
       </div>
 
+         ${renderPayrollTile("Time Loss $", "$120", "stat-yellow")}
+
+
       <div class="hero-stat" onclick="openTilePage('clockedIn')">
         <span class="material-icons icon-blue">groups</span>
         <div class="hero-num">${workforceData.clockedIn.length}</div>
         <div class="hero-label">Clocked In</div>
       </div>
 
-      <div class="hero-stat" onclick="openTilePage('onBreak')">
-        <span class="material-icons icon-purple">free_breakfast</span>
-        <div class="hero-num">${workforceData.onBreak.length}</div>
-        <div class="hero-label">On Break</div>
-      </div>
+
 
 
     </div>
 
     <!-- PAGE 2 -->
     <div class="hero-page">
+
+            <div class="hero-stat" onclick="openTilePage('onBreak')">
+        <span class="material-icons icon-purple">free_breakfast</span>
+        <div class="hero-num">${workforceData.onBreak.length}</div>
+        <div class="hero-label">On Break</div>
+      </div>
 
             <div class="hero-stat" onclick="openTilePage('missing')">
         <span class="material-icons icon-red">person_off</span>
@@ -2920,7 +2925,6 @@
         <div class="hero-label">Exceptions</div>
       </div>
 
-                                  ${renderPayrollTile("Time Loss $", "$120", "stat-yellow")}
 
 
 
